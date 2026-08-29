@@ -1,0 +1,47 @@
+name: iOS
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      # The app targets iOS 26.5, which needs Xcode 26. Resolve whatever the
+      # runner image ships rather than hard-coding an app path.
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Versions
+        run: |
+          xcodebuild -version
+          xcrun simctl list runtimes
+
+      - name: Build and test
+        run: |
+          xcodebuild test \
+            -project LettuceDecide.xcodeproj \
+            -scheme LettuceDecide \
+            -destination 'platform=iOS Simulator,name=iPhone 16,OS=latest' \
+            -parallel-testing-enabled NO \
+            -resultBundlePath TestResults.xcresult \
+            CODE_SIGNING_ALLOWED=NO
+
+      - name: Upload test results
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: TestResults
+          path: TestResults.xcresult
+          if-no-files-found: ignore

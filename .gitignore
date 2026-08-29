@@ -1,0 +1,14 @@
+# Local secrets — never commit a real Spoonacular API key
+LettuceDecide/Resources/Config.plist
+
+# Xcode / macOS
+.DS_Store
+xcuserdata/
+*.xcuserstate
+DerivedData/
+build/
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM

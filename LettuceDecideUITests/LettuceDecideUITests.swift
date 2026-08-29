@@ -10,34 +10,72 @@ import XCTest
 final class LettuceDecideUITests: XCTestCase {
 
     override func setUpWithError() throws {
-        // Put setup code here. This method is called before the invocation of each test method in the class.
-
-        // In UI tests it is usually best to stop immediately when a failure occurs.
         continueAfterFailure = false
-
-        // In UI tests it’s important to set the initial state - such as interface orientation - required for your tests before they run. The setUp method is a good place to do this.
-    }
-
-    override func tearDownWithError() throws {
-        // Put teardown code here. This method is called after the invocation of each test method in the class.
     }
 
     @MainActor
-    func testExample() throws {
-        // UI tests must launch the application that they test.
+    func testDecideButtonShowsARecommendation() throws {
         let app = XCUIApplication()
         app.launch()
 
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
-        // XCUIAutomation Documentation
-        // https://developer.apple.com/documentation/xcuiautomation
+        let decideButton = app.buttons["Decide For Me"]
+        XCTAssertTrue(decideButton.waitForExistence(timeout: 5))
+        decideButton.tap()
+
+        // Either a recipe title or an error/retry state should appear — never an indefinite spinner.
+        let recipeTitleAppeared = app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS[c] %@", "min")
+        ).firstMatch.waitForExistence(timeout: 10)
+        let retryAppeared = app.buttons["Try Again"].waitForExistence(timeout: 10)
+        XCTAssertTrue(recipeTitleAppeared || retryAppeared)
+    }
+
+    @MainActor
+    func testSettingsSheetOpensAndCloses() throws {
+        let app = XCUIApplication()
+        app.launch()
+
+        app.buttons["Settings"].tap()
+        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 5))
+
+        app.buttons["Done"].tap()
+        XCTAssertFalse(app.navigationBars["Settings"].waitForExistence(timeout: 2))
+    }
+
+    @MainActor
+    func testTogglingAnAllergenPersistsAfterReopeningSettings() throws {
+        let app = XCUIApplication()
+        app.launch()
+
+        app.buttons["Settings"].tap()
+        XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 5))
+
+        let dairyToggle = app.switches["Dairy"]
+        XCTAssertTrue(dairyToggle.waitForExistence(timeout: 5))
+        let initialValue = dairyToggle.value as? String
+        dairyToggle.flipSwitch()
+
+        app.buttons["Done"].tap()
+        app.buttons["Settings"].tap()
+
+        let reopenedToggle = app.switches["Dairy"]
+        XCTAssertTrue(reopenedToggle.waitForExistence(timeout: 5))
+        XCTAssertNotEqual(reopenedToggle.value as? String, initialValue)
     }
 
     @MainActor
     func testLaunchPerformance() throws {
-        // This measures how long it takes to launch your application.
         measure(metrics: [XCTApplicationLaunchMetric()]) {
             XCUIApplication().launch()
         }
+    }
+}
+
+extension XCUIElement {
+    /// Toggles a SwiftUI `Toggle` row. `tap()` on the row element lands on the label,
+    /// which SwiftUI does not treat as a hit on the control, so tap the trailing edge
+    /// where the switch itself sits.
+    func flipSwitch() {
+        coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
     }
 }

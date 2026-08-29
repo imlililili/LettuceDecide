@@ -7,15 +7,28 @@
 
 import SwiftUI
 
+/// Composition root: wires the real (or mock, if no API key is configured) repository,
+/// the recommendation engine, and the persisted preferences store into the view models.
 struct ContentView: View {
-    var body: some View {
-        VStack {
-            Image(systemName: "globe")
-                .imageScale(.large)
-                .foregroundStyle(.tint)
-            Text("Hello, world!")
+    private let preferencesStore: UserPreferencesStoring = UserPreferencesStore()
+    private let repository: RecipeRepository
+
+    init() {
+        if Config.spoonacularAPIKey != nil {
+            repository = SpoonacularRecipeRepository()
+        } else {
+            repository = MockRecipeRepository()
         }
-        .padding()
+    }
+
+    var body: some View {
+        RecommendationView(
+            viewModel: RecommendationViewModel(
+                engine: RecommendationEngine(repository: repository),
+                preferencesStore: preferencesStore
+            ),
+            settingsViewModel: SettingsViewModel(store: preferencesStore)
+        )
     }
 }
 
