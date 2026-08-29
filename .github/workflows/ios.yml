@@ -28,6 +28,15 @@ jobs:
           xcodebuild -version
           xcrun simctl list runtimes
 
+      # GitHub's macOS runner images don't always ship the iOS Simulator
+      # runtime pre-downloaded for the newest Xcode — only what shipped with
+      # the image (e.g. visionOS). Without this, -destination can't resolve
+      # any concrete iOS Simulator device and the test step fails.
+      - name: Ensure iOS Simulator runtime is installed
+        run: |
+          xcodebuild -downloadPlatform iOS
+          xcrun simctl list runtimes
+
       - name: Build and test
         run: |
           xcodebuild test \
