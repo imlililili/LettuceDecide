@@ -29,6 +29,9 @@ final class SpoonacularRecipeRepository: RecipeRepository {
             URLQueryItem(name: "number", value: "12"),
             URLQueryItem(name: "sort", value: "min-missing-ingredients"),
             URLQueryItem(name: "addRecipeInformation", value: "true"),
+            // Without this, complexSearch omits analyzedInstructions/instructions
+            // even with addRecipeInformation, and the detail screen has no method to show.
+            URLQueryItem(name: "addRecipeInstructions", value: "true"),
             URLQueryItem(name: "fillIngredients", value: "true"),
         ]
         if !pantryIngredientNames.isEmpty {
@@ -66,13 +69,18 @@ final class SpoonacularRecipeRepository: RecipeRepository {
             throw RecipeRepositoryError.requestFailed(statusCode: http.statusCode)
         }
 
+        return try Self.parseCandidates(from: data)
+    }
+
+    /// The wire-decoding step, split out so it can be exercised against real API fixtures
+    /// without going through the network.
+    static func parseCandidates(from data: Data) throws -> [PantryRecipeCandidate] {
         let decoded: SpoonacularSearchResponse
         do {
             decoded = try JSONDecoder().decode(SpoonacularSearchResponse.self, from: data)
         } catch {
             throw RecipeRepositoryError.invalidResponse
         }
-
         return decoded.results.map(\.asPantryCandidate)
     }
 }
@@ -138,13 +146,15 @@ private struct SpoonacularRecipe: Decodable {
     var asRecipe: Recipe {
         let ingredients = (extendedIngredients ?? []).map(\.asRecipeIngredient)
 
-        let steps: [RecipeInstructionStep] = (analyzedInstructions?.first?.steps ?? []).map { step in
-            RecipeInstructionStep(
-                id: step.number,
-                stepText: step.step,
-                ingredientNames: (step.ingredients ?? []).compactMap(\.name)
-            )
-        }
+        let steps: [RecipeInstructionStep] = (analyzedInstructions?.first?.steps ?? [])
+            .sorted { $0.number < $1.number }
+            .map { step in
+                RecipeInstructionStep(
+                    id: step.number,
+                    stepText: step.step,
+                    ingredientNames: (step.ingredients ?? []).compactMap(\.name)
+                )
+            }
 
         let ingredientNames = (extendedIngredients ?? []).compactMap { $0.nameClean ?? $0.name }
         let allergens = RecipeAllergenAnalysis.allergens(

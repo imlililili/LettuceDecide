@@ -16,9 +16,15 @@ struct ContentView: View {
     private let repository: RecipeRepository
 
     init() {
-        let uiTesting = ProcessInfo.processInfo.arguments.contains("-uiTesting")
-        preferencesStore = uiTesting ? InMemoryUserPreferencesStore() : UserPreferencesStore()
-        pantryStore = uiTesting ? InMemoryPantryStore() : PantryStore()
+        let arguments = ProcessInfo.processInfo.arguments
+        // -uiTesting: fully hermetic (mock recipes, in-memory stores).
+        // -liveTest:  real Spoonacular, but a scratch in-memory pantry so each launch
+        //             starts clean.
+        let uiTesting = arguments.contains("-uiTesting")
+        let scratchStores = uiTesting || arguments.contains("-liveTest")
+
+        preferencesStore = scratchStores ? InMemoryUserPreferencesStore() : UserPreferencesStore()
+        pantryStore = scratchStores ? InMemoryPantryStore() : PantryStore()
 
         if !uiTesting, Config.spoonacularAPIKey != nil {
             repository = SpoonacularRecipeRepository()

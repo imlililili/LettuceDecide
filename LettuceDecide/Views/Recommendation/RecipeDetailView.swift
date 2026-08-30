@@ -166,9 +166,13 @@ private struct IngredientStatusRow: View {
             Image(systemName: icon)
                 .foregroundStyle(tint)
             VStack(alignment: .leading, spacing: 2) {
-                Text(status.name)
+                HStack(spacing: 6) {
+                    Text(status.name)
+                    Text(status.requiredAmount)
+                        .foregroundStyle(.secondary)
+                }
                 if let detail {
-                    Text(detail).font(.caption).foregroundStyle(.secondary)
+                    Text(detail).font(.caption).foregroundStyle(tint)
                 }
             }
             Spacer()
@@ -195,8 +199,8 @@ private struct IngredientStatusRow: View {
         switch status.kind {
         case .have:
             return nil
-        case .shortBy(let have, let need, let unit):
-            return "You have \(number(have)) \(unit.displayName), recipe needs \(number(need))"
+        case .shortBy(let have, let unit):
+            return "Only \(number(have)) \(unit.displayName) in your pantry"
         case .missing:
             return "Not in your pantry"
         }
