@@ -1,31 +1,51 @@
+import Foundation
 import Testing
 @testable import LettuceDecide
 
 @MainActor
 struct RecommendationViewModelTests {
-    @Test func decideTransitionsFromLoadingToLoadedOnSuccess() async {
-        let mock = MockRecipeRepository(fixedRecipes: [MockRecipeRepository.sampleRecipes[0]])
-        let viewModel = RecommendationViewModel(
-            engine: RecommendationEngine(repository: mock),
+    private func makeUseCase(
+        pantry: [PantryIngredient],
+        repository: RecipeRepository = MockRecipeRepository()
+    ) -> RecommendMealsFromPantryUseCase {
+        RecommendMealsFromPantryUseCase(
+            recipeRepository: repository,
+            pantryStore: InMemoryPantryStore(initial: pantry),
             preferencesStore: InMemoryUserPreferencesStore()
         )
+    }
+
+    @Test func decideTransitionsFromLoadingToLoadedOnSuccess() async {
+        let viewModel = RecommendationViewModel(recommendMeals: makeUseCase(
+            pantry: [PantryIngredient(ingredientName: "spinach", quantity: 200, unit: .grams, storageLocation: .fridge)]
+        ))
 
         #expect(viewModel.state == .idle)
         await viewModel.decide()
 
-        guard case .loaded(let recipe) = viewModel.state else {
+        guard case .loaded = viewModel.state else {
             Issue.record("Expected .loaded state, got \(viewModel.state)")
             return
         }
-        #expect(recipe.id == MockRecipeRepository.sampleRecipes[0].id)
     }
 
-    @Test func decideTransitionsToFailedOnError() async {
-        let mock = MockRecipeRepository(errorToThrow: RecipeRepositoryError.noResultsFound)
-        let viewModel = RecommendationViewModel(
-            engine: RecommendationEngine(repository: mock),
-            preferencesStore: InMemoryUserPreferencesStore()
-        )
+    @Test func decideTransitionsToFailedWhenPantryIsEmpty() async {
+        let viewModel = RecommendationViewModel(recommendMeals: makeUseCase(pantry: []))
+
+        await viewModel.decide()
+
+        guard case .failed = viewModel.state else {
+            Issue.record("Expected .failed state, got \(viewModel.state)")
+            return
+        }
+    }
+
+    @Test func decideTransitionsToFailedOnServiceError() async {
+        let repository = MockRecipeRepository(errorToThrow: RecipeRepositoryError.noResultsFound)
+        let viewModel = RecommendationViewModel(recommendMeals: makeUseCase(
+            pantry: [PantryIngredient(ingredientName: "rice", quantity: 500, unit: .grams, storageLocation: .pantry)],
+            repository: repository
+        ))
 
         await viewModel.decide()
 
