@@ -9,11 +9,14 @@ import Combine
 struct IngredientStatus: Identifiable, Equatable {
     let id: Int
     let name: String
+    /// The amount the recipe calls for, e.g. "2 cups", "16 pcs" — always shown so no line
+    /// is left with a blank or vague quantity.
+    let requiredAmount: String
     let kind: Kind
 
     enum Kind: Equatable {
         case have
-        case shortBy(have: Double, need: Double, unit: IngredientUnit)
+        case shortBy(have: Double, unit: IngredientUnit)
         case missing
     }
 }
@@ -43,7 +46,12 @@ final class RecipeDetailViewModel: ObservableObject {
 
     var ingredientStatuses: [IngredientStatus] {
         recipe.requiredIngredients.enumerated().map { index, required in
-            IngredientStatus(id: index, name: required.name, kind: kind(for: required))
+            IngredientStatus(
+                id: index,
+                name: required.name,
+                requiredAmount: "\(number(required.requiredQuantity)) \(required.unit.displayName)",
+                kind: kind(for: required)
+            )
         }
     }
 
@@ -68,9 +76,13 @@ final class RecipeDetailViewModel: ObservableObject {
             return .missing
         }
         if owned.unit == required.unit, owned.quantity < required.requiredQuantity {
-            return .shortBy(have: owned.quantity, need: required.requiredQuantity, unit: required.unit)
+            return .shortBy(have: owned.quantity, unit: required.unit)
         }
         return .have
+    }
+
+    private func number(_ value: Double) -> String {
+        value == value.rounded() ? String(Int(value)) : String(value)
     }
 
     private func message(for outcome: InventoryUpdateOutcome) -> String {
