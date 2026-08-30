@@ -6,17 +6,20 @@ struct RecommendationView: View {
     @StateObject private var viewModel: RecommendationViewModel
     @StateObject private var settingsViewModel: SettingsViewModel
     @StateObject private var pantryViewModel: PantryViewModel
+    private let pantryStore: PantryStoring
     @State private var showingSettings = false
     @State private var showingPantry = false
 
     init(
         viewModel: @autoclosure @escaping () -> RecommendationViewModel,
         settingsViewModel: @autoclosure @escaping () -> SettingsViewModel,
-        pantryViewModel: @autoclosure @escaping () -> PantryViewModel
+        pantryViewModel: @autoclosure @escaping () -> PantryViewModel,
+        pantryStore: PantryStoring
     ) {
         _viewModel = StateObject(wrappedValue: viewModel())
         _settingsViewModel = StateObject(wrappedValue: settingsViewModel())
         _pantryViewModel = StateObject(wrappedValue: pantryViewModel())
+        self.pantryStore = pantryStore
     }
 
     var body: some View {
@@ -68,7 +71,17 @@ struct RecommendationView: View {
             LoadingView(message: "Finding recipes you can make…")
         case .loaded(let results):
             List(results) { result in
-                RecommendationRow(result: result)
+                NavigationLink {
+                    RecipeDetailView(
+                        viewModel: RecipeDetailViewModel(result: result, pantryStore: pantryStore),
+                        onCooked: {
+                            pantryViewModel.reload()
+                            Task { await viewModel.decide() }
+                        }
+                    )
+                } label: {
+                    RecommendationRow(result: result)
+                }
             }
             .listStyle(.plain)
             .refreshable { await viewModel.decide() }
@@ -103,6 +116,7 @@ struct RecommendationView: View {
             )
         ),
         settingsViewModel: SettingsViewModel(store: preferencesStore),
-        pantryViewModel: PantryViewModel(store: pantryStore)
+        pantryViewModel: PantryViewModel(store: pantryStore),
+        pantryStore: pantryStore
     )
 }

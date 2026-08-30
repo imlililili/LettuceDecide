@@ -82,12 +82,20 @@ struct Recipe: Identifiable, Codable, Equatable, Hashable {
 extension Recipe {
     /// A plain-text rendering of `summary` with HTML tags removed, for simple label display.
     var plainSummary: String? {
-        guard let summary else { return nil }
-        return summary.replacingOccurrences(
-            of: "<[^>]+>",
-            with: "",
-            options: .regularExpression
-        )
+        summary?.htmlTagsStripped
+    }
+
+    /// Plain-text fallback instructions (used only when `analyzedSteps` is empty).
+    var plainInstructions: String? {
+        guard let instructions, !instructions.isEmpty else { return nil }
+        let stripped = instructions.htmlTagsStripped.trimmingCharacters(in: .whitespacesAndNewlines)
+        return stripped.isEmpty ? nil : stripped
+    }
+}
+
+extension String {
+    var htmlTagsStripped: String {
+        replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
     }
 }
 

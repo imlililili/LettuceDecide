@@ -37,7 +37,8 @@ struct ContentView: View {
                 )
             ),
             settingsViewModel: SettingsViewModel(store: preferencesStore),
-            pantryViewModel: PantryViewModel(store: pantryStore)
+            pantryViewModel: PantryViewModel(store: pantryStore),
+            pantryStore: pantryStore
         )
     }
 }
