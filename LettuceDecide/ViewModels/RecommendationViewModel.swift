@@ -19,7 +19,7 @@ final class RecommendationViewModel: ObservableObject {
     enum State: Equatable {
         case idle
         case loading
-        case loaded(Recipe)
+        case loaded([PantryMatchResult])
         case failed(Failure)
     }
 
@@ -35,13 +35,13 @@ final class RecommendationViewModel: ObservableObject {
         state = .loading
         do {
             let results = try await recommendMeals.execute()
-            if let top = results.first {
-                state = .loaded(top.recipe)
-            } else {
+            if results.isEmpty {
                 state = .failed(Failure(
                     message: MealRecommendationError.noSafeRecipesAvailable.localizedDescription,
                     recovery: .retry
                 ))
+            } else {
+                state = .loaded(results)
             }
         } catch let error as MealRecommendationError {
             state = .failed(Failure(message: error.localizedDescription, recovery: error.recovery))
