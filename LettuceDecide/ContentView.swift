@@ -7,16 +7,20 @@
 
 import SwiftUI
 
-/// Composition root: wires the real (or mock, if no API key is configured) recipe
-/// repository, the persisted pantry and preferences stores, and the recommendation use
-/// case into the view models.
+/// Composition root: wires the recipe repository (real, or mock when there's no API key or
+/// during UI tests), the persisted pantry and preferences stores, and the recommendation
+/// use case into the view models.
 struct ContentView: View {
-    private let preferencesStore: UserPreferencesStoring = UserPreferencesStore()
-    private let pantryStore: PantryStoring = PantryStore()
+    private let preferencesStore: UserPreferencesStoring
+    private let pantryStore: PantryStoring
     private let repository: RecipeRepository
 
     init() {
-        if Config.spoonacularAPIKey != nil {
+        let uiTesting = ProcessInfo.processInfo.arguments.contains("-uiTesting")
+        preferencesStore = uiTesting ? InMemoryUserPreferencesStore() : UserPreferencesStore()
+        pantryStore = uiTesting ? InMemoryPantryStore() : PantryStore()
+
+        if !uiTesting, Config.spoonacularAPIKey != nil {
             repository = SpoonacularRecipeRepository()
         } else {
             repository = MockRecipeRepository()
@@ -32,7 +36,8 @@ struct ContentView: View {
                     preferencesStore: preferencesStore
                 )
             ),
-            settingsViewModel: SettingsViewModel(store: preferencesStore)
+            settingsViewModel: SettingsViewModel(store: preferencesStore),
+            pantryViewModel: PantryViewModel(store: pantryStore)
         )
     }
 }
