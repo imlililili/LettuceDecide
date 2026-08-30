@@ -23,7 +23,14 @@ enum RecipeRepositoryError: LocalizedError {
     }
 }
 
-/// Fetches recipe recommendations honoring a set of dietary preferences.
+/// Finds recipes the cook can make from ingredients they already have.
 protocol RecipeRepository {
-    func fetchRandomRecipe(matching preferences: UserPreferences, excluding excludedIDs: Set<Int>) async throws -> Recipe
+    /// Recipes that use one or more of `pantryIngredientNames`, honouring `preferences`.
+    ///
+    /// The service decides which supplied ingredients each recipe uses and which further
+    /// ingredients it needs — this app does not re-derive that ingredient match itself.
+    func findRecipes(
+        usingPantryNames pantryIngredientNames: [String],
+        matching preferences: UserPreferences
+    ) async throws -> [PantryRecipeCandidate]
 }

@@ -9,7 +9,10 @@ final class SpoonacularRecipeRepository: RecipeRepository {
         self.session = session
     }
 
-    func fetchRandomRecipe(matching preferences: UserPreferences, excluding excludedIDs: Set<Int>) async throws -> Recipe {
+    func findRecipes(
+        usingPantryNames pantryIngredientNames: [String],
+        matching preferences: UserPreferences
+    ) async throws -> [PantryRecipeCandidate] {
         let apiKey: String
         do {
             apiKey = try Config.requireAPIKey()
@@ -17,14 +20,23 @@ final class SpoonacularRecipeRepository: RecipeRepository {
             throw RecipeRepositoryError.missingAPIKey
         }
 
-        var components = URLComponents(url: baseURL.appendingPathComponent("complexSearch"), resolvingAgainstBaseURL: false)!
+        var components = URLComponents(
+            url: baseURL.appendingPathComponent("complexSearch"),
+            resolvingAgainstBaseURL: false
+        )!
         var items: [URLQueryItem] = [
             URLQueryItem(name: "apiKey", value: apiKey),
-            URLQueryItem(name: "sort", value: "random"),
-            URLQueryItem(name: "number", value: "5"),
+            URLQueryItem(name: "number", value: "12"),
+            URLQueryItem(name: "sort", value: "min-missing-ingredients"),
             URLQueryItem(name: "addRecipeInformation", value: "true"),
             URLQueryItem(name: "fillIngredients", value: "true"),
         ]
+        if !pantryIngredientNames.isEmpty {
+            items.append(URLQueryItem(
+                name: "includeIngredients",
+                value: pantryIngredientNames.joined(separator: ",")
+            ))
+        }
         if !preferences.intolerances.isEmpty {
             items.append(URLQueryItem(
                 name: "intolerances",
@@ -36,12 +48,6 @@ final class SpoonacularRecipeRepository: RecipeRepository {
         }
         if let maxTime = preferences.maxReadyTimeMinutes {
             items.append(URLQueryItem(name: "maxReadyTime", value: String(maxTime)))
-        }
-        if !preferences.excludedIngredients.isEmpty {
-            items.append(URLQueryItem(
-                name: "excludeIngredients",
-                value: preferences.excludedIngredients.joined(separator: ",")
-            ))
         }
         components.queryItems = items
 
@@ -67,11 +73,7 @@ final class SpoonacularRecipeRepository: RecipeRepository {
             throw RecipeRepositoryError.invalidResponse
         }
 
-        let candidates = decoded.results.map(\.asRecipe).filter { !excludedIDs.contains($0.id) }
-        guard let pick = candidates.randomElement() ?? decoded.results.first?.asRecipe else {
-            throw RecipeRepositoryError.noResultsFound
-        }
-        return pick
+        return decoded.results.map(\.asPantryCandidate)
     }
 }
 
@@ -79,6 +81,23 @@ final class SpoonacularRecipeRepository: RecipeRepository {
 
 private struct SpoonacularSearchResponse: Decodable {
     let results: [SpoonacularRecipe]
+}
+
+private struct SpoonacularIngredient: Decodable {
+    let id: Int?
+    let name: String?
+    let nameClean: String?
+    let amount: Double?
+    let unit: String?
+
+    var asRecipeIngredient: RecipeIngredient {
+        RecipeIngredient(
+            id: id ?? abs((nameClean ?? name ?? "").hashValue),
+            name: nameClean ?? name ?? "ingredient",
+            requiredQuantity: amount ?? 0,
+            unit: IngredientUnit(spoonacularUnit: unit ?? "") ?? .pieces
+        )
+    }
 }
 
 private struct SpoonacularRecipe: Decodable {
@@ -97,16 +116,10 @@ private struct SpoonacularRecipe: Decodable {
     let vegan: Bool?
     let vegetarian: Bool?
     let instructions: String?
-    let extendedIngredients: [ExtendedIngredient]?
+    let extendedIngredients: [SpoonacularIngredient]?
     let analyzedInstructions: [AnalyzedInstruction]?
-
-    struct ExtendedIngredient: Decodable {
-        let id: Int?
-        let name: String?
-        let nameClean: String?
-        let amount: Double?
-        let unit: String?
-    }
+    let usedIngredients: [SpoonacularIngredient]?
+    let missedIngredients: [SpoonacularIngredient]?
 
     struct AnalyzedInstruction: Decodable {
         let steps: [Step]
@@ -123,14 +136,7 @@ private struct SpoonacularRecipe: Decodable {
     }
 
     var asRecipe: Recipe {
-        let ingredients: [RecipeIngredient] = (extendedIngredients ?? []).map { raw in
-            RecipeIngredient(
-                id: raw.id ?? abs((raw.nameClean ?? raw.name ?? "").hashValue),
-                name: raw.nameClean ?? raw.name ?? "ingredient",
-                requiredQuantity: raw.amount ?? 0,
-                unit: IngredientUnit(spoonacularUnit: raw.unit ?? "") ?? .pieces
-            )
-        }
+        let ingredients = (extendedIngredients ?? []).map(\.asRecipeIngredient)
 
         let steps: [RecipeInstructionStep] = (analyzedInstructions?.first?.steps ?? []).map { step in
             RecipeInstructionStep(
@@ -164,6 +170,14 @@ private struct SpoonacularRecipe: Decodable {
             analyzedSteps: steps,
             instructions: instructions,
             containsAllergens: allergens
+        )
+    }
+
+    var asPantryCandidate: PantryRecipeCandidate {
+        PantryRecipeCandidate(
+            recipe: asRecipe,
+            usedIngredientNames: (usedIngredients ?? []).compactMap { $0.nameClean ?? $0.name },
+            missedIngredients: (missedIngredients ?? []).map(\.asRecipeIngredient)
         )
     }
 }
