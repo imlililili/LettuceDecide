@@ -3,14 +3,18 @@ import SwiftUI
 struct RecommendationView: View {
     @StateObject private var viewModel: RecommendationViewModel
     @StateObject private var settingsViewModel: SettingsViewModel
+    @StateObject private var pantryViewModel: PantryViewModel
     @State private var showingSettings = false
+    @State private var showingPantry = false
 
     init(
         viewModel: @autoclosure @escaping () -> RecommendationViewModel,
-        settingsViewModel: @autoclosure @escaping () -> SettingsViewModel
+        settingsViewModel: @autoclosure @escaping () -> SettingsViewModel,
+        pantryViewModel: @autoclosure @escaping () -> PantryViewModel
     ) {
         _viewModel = StateObject(wrappedValue: viewModel())
         _settingsViewModel = StateObject(wrappedValue: settingsViewModel())
+        _pantryViewModel = StateObject(wrappedValue: pantryViewModel())
     }
 
     var body: some View {
@@ -24,6 +28,14 @@ struct RecommendationView: View {
             .padding()
             .navigationTitle("Lettuce Decide")
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    Button {
+                        showingPantry = true
+                    } label: {
+                        Image(systemName: "refrigerator")
+                    }
+                    .accessibilityLabel("Pantry")
+                }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
                         showingSettings = true
@@ -33,12 +45,21 @@ struct RecommendationView: View {
                     .accessibilityLabel("Settings")
                 }
             }
+            .navigationDestination(isPresented: $showingPantry) {
+                PantryView(viewModel: pantryViewModel)
+            }
             .sheet(isPresented: $showingSettings) {
                 SettingsView(viewModel: settingsViewModel)
             }
             .task {
                 if viewModel.state == .idle {
                     await viewModel.decide()
+                }
+            }
+            .onChange(of: showingPantry) { _, isShowing in
+                // Coming back from the pantry: the inventory may have changed, so re-decide.
+                if !isShowing {
+                    Task { await viewModel.decide() }
                 }
             }
         }
@@ -55,9 +76,17 @@ struct RecommendationView: View {
             ScrollView {
                 RecipeCardView(recipe: recipe)
             }
-        case .failed(let message):
-            ErrorStateView(message: message) {
-                Task { await viewModel.decide() }
+        case .failed(let failure):
+            ErrorStateView(
+                message: failure.message,
+                actionTitle: failure.recovery == .addIngredients ? "Add Ingredients" : "Try Again"
+            ) {
+                switch failure.recovery {
+                case .retry:
+                    Task { await viewModel.decide() }
+                case .addIngredients:
+                    showingPantry = true
+                }
             }
         }
     }
@@ -78,17 +107,20 @@ struct RecommendationView: View {
 }
 
 #Preview {
+    let pantryStore = InMemoryPantryStore(initial: [
+        PantryIngredient(ingredientName: "chickpeas", quantity: 400, unit: .grams, storageLocation: .pantry),
+        PantryIngredient(ingredientName: "spinach", quantity: 200, unit: .grams, storageLocation: .fridge),
+    ])
+    let preferencesStore = InMemoryUserPreferencesStore()
     RecommendationView(
         viewModel: RecommendationViewModel(
             recommendMeals: RecommendMealsFromPantryUseCase(
                 recipeRepository: MockRecipeRepository(),
-                pantryStore: InMemoryPantryStore(initial: [
-                    PantryIngredient(ingredientName: "chickpeas", quantity: 400, unit: .grams, storageLocation: .pantry),
-                    PantryIngredient(ingredientName: "spinach", quantity: 200, unit: .grams, storageLocation: .fridge),
-                ]),
-                preferencesStore: InMemoryUserPreferencesStore()
+                pantryStore: pantryStore,
+                preferencesStore: preferencesStore
             )
         ),
-        settingsViewModel: SettingsViewModel(store: InMemoryUserPreferencesStore())
+        settingsViewModel: SettingsViewModel(store: preferencesStore),
+        pantryViewModel: PantryViewModel(store: pantryStore)
     )
 }
