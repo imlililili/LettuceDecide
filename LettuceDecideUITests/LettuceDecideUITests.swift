@@ -27,21 +27,15 @@ final class LettuceDecideUITests: XCTestCase {
     func testEmptyPantryPromptsToAddIngredients() throws {
         let app = launchApp()
 
-        let decideButton = app.buttons["Decide For Me"]
-        XCTAssertTrue(decideButton.waitForExistence(timeout: 5))
-        decideButton.tap()
-
-        // Empty pantry: the recovery action is "Add Ingredients", not a pointless retry.
+        // The list loads on appear; an empty pantry offers "Add Ingredients", not a
+        // pointless retry.
         XCTAssertTrue(app.buttons["Add Ingredients"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.buttons["Try Again"].exists)
     }
 
     @MainActor
-    func testAddingAPantryIngredientEnablesARecommendation() throws {
+    func testAddingAPantryIngredientProducesRecommendations() throws {
         let app = launchApp()
-
-        XCTAssertTrue(app.buttons["Decide For Me"].waitForExistence(timeout: 5))
-        app.buttons["Decide For Me"].tap()
 
         XCTAssertTrue(app.buttons["Add Ingredients"].waitForExistence(timeout: 10))
         app.buttons["Add Ingredients"].tap()
@@ -55,17 +49,17 @@ final class LettuceDecideUITests: XCTestCase {
         nameField.typeText("chickpeas")
         app.buttons["Save"].tap()
 
-        // Row is now in the pantry.
         XCTAssertTrue(app.staticTexts["chickpeas"].waitForExistence(timeout: 5))
 
-        // Back to recommendations; with a stocked pantry a recipe should appear.
+        // Back to recommendations; with a stocked pantry the ranked list appears.
         app.navigationBars["Pantry"].buttons.firstMatch.tap()
 
-        let recipeTitleAppeared = app.staticTexts.matching(
-            NSPredicate(format: "label CONTAINS[c] %@", "min")
-        ).firstMatch.waitForExistence(timeout: 10)
-        let retryAppeared = app.buttons["Try Again"].waitForExistence(timeout: 10)
-        XCTAssertTrue(recipeTitleAppeared || retryAppeared)
+        XCTAssertTrue(app.staticTexts["Chickpea and Spinach Curry"].waitForExistence(timeout: 10))
+        XCTAssertTrue(
+            app.staticTexts.matching(
+                NSPredicate(format: "label CONTAINS[c] %@", "of ingredients in your pantry")
+            ).firstMatch.exists
+        )
     }
 
     @MainActor
