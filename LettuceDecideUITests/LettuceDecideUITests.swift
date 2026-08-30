@@ -63,6 +63,48 @@ final class LettuceDecideUITests: XCTestCase {
     }
 
     @MainActor
+    func testMarkingARecipeAsCookedDeductsFromThePantry() throws {
+        let app = launchApp()
+
+        XCTAssertTrue(app.buttons["Add Ingredients"].waitForExistence(timeout: 10))
+        app.buttons["Add Ingredients"].tap()
+
+        XCTAssertTrue(app.navigationBars["Pantry"].waitForExistence(timeout: 5))
+        app.buttons["Add Ingredient"].firstMatch.tap()
+
+        let nameField = app.textFields["Ingredient"]
+        XCTAssertTrue(nameField.waitForExistence(timeout: 5))
+        nameField.tap()
+        nameField.typeText("chickpeas")
+        let quantityField = app.textFields["Quantity"]
+        quantityField.clearText()
+        quantityField.typeText("1000")
+        app.buttons["Save"].tap()
+
+        app.navigationBars["Pantry"].buttons.firstMatch.tap()
+
+        let curry = app.staticTexts["Chickpea and Spinach Curry"]
+        XCTAssertTrue(curry.waitForExistence(timeout: 10))
+        curry.tap()
+
+        let cookButton = app.buttons["Mark as Cooked"]
+        XCTAssertTrue(cookButton.waitForExistence(timeout: 5))
+        cookButton.tap()
+
+        let ok = app.buttons["OK"]
+        XCTAssertTrue(ok.waitForExistence(timeout: 5))
+        ok.tap()
+
+        // Curry needs 400g chickpeas; 1000 - 400 = 600 should remain.
+        app.buttons["Pantry"].tap()
+        XCTAssertTrue(
+            app.staticTexts.matching(
+                NSPredicate(format: "label CONTAINS %@", "600")
+            ).firstMatch.waitForExistence(timeout: 5)
+        )
+    }
+
+    @MainActor
     func testAddIngredientRejectsInvalidQuantityWithADomainMessage() throws {
         let app = launchApp()
 
