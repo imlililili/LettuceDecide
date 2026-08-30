@@ -23,10 +23,11 @@ struct RecommendationViewModelTests {
         #expect(viewModel.state == .idle)
         await viewModel.decide()
 
-        guard case .loaded = viewModel.state else {
+        guard case .loaded(let results) = viewModel.state else {
             Issue.record("Expected .loaded state, got \(viewModel.state)")
             return
         }
+        #expect(!results.isEmpty)
     }
 
     @Test func decideTransitionsToFailedWhenPantryIsEmpty() async {
