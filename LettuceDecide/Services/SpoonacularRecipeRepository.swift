@@ -23,6 +23,7 @@ final class SpoonacularRecipeRepository: RecipeRepository {
             URLQueryItem(name: "sort", value: "random"),
             URLQueryItem(name: "number", value: "5"),
             URLQueryItem(name: "addRecipeInformation", value: "true"),
+            URLQueryItem(name: "fillIngredients", value: "true"),
         ]
         if !preferences.intolerances.isEmpty {
             items.append(URLQueryItem(
@@ -87,21 +88,82 @@ private struct SpoonacularRecipe: Decodable {
     let readyInMinutes: Int?
     let servings: Int?
     let sourceUrl: String?
+    let sourceName: String?
     let summary: String?
     let healthScore: Double?
     let diets: [String]?
+    let glutenFree: Bool?
+    let dairyFree: Bool?
+    let vegan: Bool?
+    let vegetarian: Bool?
+    let instructions: String?
+    let extendedIngredients: [ExtendedIngredient]?
+    let analyzedInstructions: [AnalyzedInstruction]?
+
+    struct ExtendedIngredient: Decodable {
+        let id: Int?
+        let name: String?
+        let nameClean: String?
+        let amount: Double?
+        let unit: String?
+    }
+
+    struct AnalyzedInstruction: Decodable {
+        let steps: [Step]
+
+        struct Step: Decodable {
+            let number: Int
+            let step: String
+            let ingredients: [NamedItem]?
+
+            struct NamedItem: Decodable {
+                let name: String?
+            }
+        }
+    }
 
     var asRecipe: Recipe {
-        Recipe(
+        let ingredients: [RecipeIngredient] = (extendedIngredients ?? []).map { raw in
+            RecipeIngredient(
+                id: raw.id ?? abs((raw.nameClean ?? raw.name ?? "").hashValue),
+                name: raw.nameClean ?? raw.name ?? "ingredient",
+                requiredQuantity: raw.amount ?? 0,
+                unit: IngredientUnit(spoonacularUnit: raw.unit ?? "") ?? .pieces
+            )
+        }
+
+        let steps: [RecipeInstructionStep] = (analyzedInstructions?.first?.steps ?? []).map { step in
+            RecipeInstructionStep(
+                id: step.number,
+                stepText: step.step,
+                ingredientNames: (step.ingredients ?? []).compactMap(\.name)
+            )
+        }
+
+        let ingredientNames = (extendedIngredients ?? []).compactMap { $0.nameClean ?? $0.name }
+        let allergens = RecipeAllergenAnalysis.allergens(
+            inIngredientNames: ingredientNames,
+            knownDairyFree: dairyFree ?? false,
+            knownGlutenFree: glutenFree ?? false,
+            vegan: vegan ?? false,
+            vegetarian: vegetarian ?? false
+        )
+
+        return Recipe(
             id: id,
             title: title,
             imageURL: image.flatMap(URL.init(string:)),
             readyInMinutes: readyInMinutes,
             servings: servings,
             sourceURL: sourceUrl.flatMap(URL.init(string:)),
+            sourceName: sourceName,
             summary: summary,
             healthScore: healthScore,
-            diets: diets ?? []
+            diets: diets ?? [],
+            requiredIngredients: ingredients,
+            analyzedSteps: steps,
+            instructions: instructions,
+            containsAllergens: allergens
         )
     }
 }
