@@ -1,0 +1,80 @@
+import Foundation
+import Testing
+@testable import LettuceDecide
+
+struct UpdateInventoryAfterCookingUseCaseTests {
+    private func recipe(_ required: [RecipeIngredient]) -> Recipe {
+        Recipe(id: 42, title: "Test Bake", requiredIngredients: required)
+    }
+
+    private func result(recipe: Recipe, matched: [PantryIngredient]) -> PantryMatchResult {
+        PantryMatchResult(
+            id: recipe.id,
+            recipe: recipe,
+            matchedIngredients: matched,
+            missingIngredients: [],
+            usesExpiringIngredients: false
+        )
+    }
+
+    @Test func updateInventory_deductsQuantity_afterRecipeIsCooked() throws {
+        let flour = PantryIngredient(ingredientName: "flour", quantity: 500, unit: .grams, storageLocation: .pantry)
+        let store = InMemoryPantryStore(initial: [flour])
+        let cooked = recipe([RecipeIngredient(id: 1, name: "flour", requiredQuantity: 200, unit: .grams)])
+
+        let outcome = try UpdateInventoryAfterCookingUseCase(store: store)
+            .execute(result(recipe: cooked, matched: [flour]))
+
+        #expect(outcome.deducted == ["flour"])
+        #expect(store.load().first?.quantity == 300)
+    }
+
+    @Test func updateInventory_fails_whenRequestedQuantityExceedsAvailable() {
+        let flour = PantryIngredient(ingredientName: "flour", quantity: 100, unit: .grams, storageLocation: .pantry)
+        let store = InMemoryPantryStore(initial: [flour])
+        let cooked = recipe([RecipeIngredient(id: 1, name: "flour", requiredQuantity: 250, unit: .grams)])
+
+        #expect(throws: InventoryUpdateError.insufficientQuantity(ingredientName: "flour", available: 100, requested: 250)) {
+            try UpdateInventoryAfterCookingUseCase(store: store)
+                .execute(result(recipe: cooked, matched: [flour]))
+        }
+        // Nothing was saved.
+        #expect(store.load().first?.quantity == 100)
+    }
+
+    @Test func updateInventory_skipsAndReportsIngredientsMeasuredInADifferentUnit() throws {
+        let flour = PantryIngredient(ingredientName: "flour", quantity: 500, unit: .grams, storageLocation: .pantry)
+        let store = InMemoryPantryStore(initial: [flour])
+        let cooked = recipe([RecipeIngredient(id: 1, name: "flour", requiredQuantity: 2, unit: .cups)])
+
+        let outcome = try UpdateInventoryAfterCookingUseCase(store: store)
+            .execute(result(recipe: cooked, matched: [flour]))
+
+        #expect(outcome.deducted.isEmpty)
+        #expect(outcome.needsManualReview.map(\.name) == ["flour"])
+        #expect(store.load().first?.quantity == 500)
+    }
+
+    @Test func updateInventory_removesLineWhenItReachesExactlyZero() throws {
+        let eggs = PantryIngredient(ingredientName: "eggs", quantity: 3, unit: .pieces, storageLocation: .fridge)
+        let store = InMemoryPantryStore(initial: [eggs])
+        let cooked = recipe([RecipeIngredient(id: 1, name: "egg", requiredQuantity: 3, unit: .pieces)])
+
+        let outcome = try UpdateInventoryAfterCookingUseCase(store: store)
+            .execute(result(recipe: cooked, matched: [eggs]))
+
+        #expect(outcome.deducted == ["eggs"])
+        #expect(store.load().isEmpty)
+    }
+
+    @Test func updateInventory_fails_whenAMatchedLineWasRemovedSinceTheRecommendation() {
+        let stale = PantryIngredient(ingredientName: "butter", quantity: 250, unit: .grams, storageLocation: .fridge)
+        let store = InMemoryPantryStore(initial: [])
+        let cooked = recipe([RecipeIngredient(id: 1, name: "butter", requiredQuantity: 50, unit: .grams)])
+
+        #expect(throws: InventoryUpdateError.ingredientNotFound(name: "butter")) {
+            try UpdateInventoryAfterCookingUseCase(store: store)
+                .execute(result(recipe: cooked, matched: [stale]))
+        }
+    }
+}
