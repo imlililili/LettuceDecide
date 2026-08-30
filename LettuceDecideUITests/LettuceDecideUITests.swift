@@ -162,6 +162,81 @@ final class LettuceDecideUITests: XCTestCase {
         XCTAssertNotEqual(reopenedToggle.value as? String, initialValue)
     }
 
+    /// End-to-end check that the app is talking to the real Spoonacular API (real key in
+    /// the app bundle, no -uiTesting flag). Skipped unless run with
+    /// `TEST_RUNNER_RUN_LIVE_API_TESTS=1`, so CI (which has no key) doesn't fail on it.
+    @MainActor
+    func testLiveSpoonacularPipelineEndToEnd() throws {
+        try XCTSkipUnless(
+            ProcessInfo.processInfo.environment["RUN_LIVE_API_TESTS"] == "1",
+            "live API test — set TEST_RUNNER_RUN_LIVE_API_TESTS=1 to run"
+        )
+
+        let app = XCUIApplication()
+        app.launchArguments = ["-liveTest"] // real Spoonacular, scratch (empty) pantry
+        app.launch()
+
+        // Empty pantry on a clean launch.
+        XCTAssertTrue(app.buttons["Add Ingredients"].waitForExistence(timeout: 20))
+        add(keptScreenshot(app))
+        app.buttons["Add Ingredients"].tap()
+        XCTAssertTrue(app.navigationBars["Pantry"].waitForExistence(timeout: 5))
+        for ingredient in ["chicken breast", "rice", "broccoli"] {
+            app.buttons["Add Ingredient"].firstMatch.tap()
+            let nameField = app.textFields["Ingredient"]
+            XCTAssertTrue(nameField.waitForExistence(timeout: 5))
+            nameField.tap()
+            nameField.typeText(ingredient)
+            app.buttons["Save"].tap()
+            XCTAssertTrue(app.staticTexts[ingredient].waitForExistence(timeout: 5))
+        }
+
+        app.navigationBars["Pantry"].buttons.firstMatch.tap()
+
+        // The list should load real recipes — never the three fixed mock titles.
+        let mockTitles = ["Lemon Garlic Roasted Salmon", "Chickpea and Spinach Curry", "Classic Margherita Pizza"]
+        let anyRow = app.staticTexts.matching(
+            NSPredicate(format: "label CONTAINS[c] %@", "of ingredients in your pantry")
+        ).firstMatch
+        XCTAssertTrue(anyRow.waitForExistence(timeout: 20), "recommendations list did not load")
+        add(keptScreenshot(app))
+        for title in mockTitles {
+            XCTAssertFalse(app.staticTexts[title].exists, "still showing mock recipe: \(title)")
+        }
+
+        // Open the first recipe's detail.
+        app.cells.firstMatch.staticTexts.firstMatch.tap()
+        XCTAssertTrue(app.buttons["Mark as Cooked"].waitForExistence(timeout: 10))
+
+        // Real method steps, not the fallback.
+        XCTAssertFalse(
+            app.staticTexts["No instructions available for this recipe."].exists,
+            "detail fell back to the no-instructions placeholder"
+        )
+        // Every ingredient row carries a concrete amount + unit.
+        add(keptScreenshot(app))
+
+        // Scroll the method + attribution into view and capture it.
+        app.swipeUp()
+        app.swipeUp()
+        add(keptScreenshot(app))
+
+        let attribution = NSPredicate(format: "label BEGINSWITH %@", "Recipe from")
+        XCTAssertTrue(
+            app.buttons.matching(attribution).firstMatch.exists
+            || app.links.matching(attribution).firstMatch.exists
+            || app.staticTexts.matching(attribution).firstMatch.exists,
+            "no source attribution on the detail screen"
+        )
+    }
+
+    @MainActor
+    private func keptScreenshot(_ app: XCUIApplication) -> XCTAttachment {
+        let attachment = XCTAttachment(screenshot: app.screenshot())
+        attachment.lifetime = .keepAlways
+        return attachment
+    }
+
     @MainActor
     func testLaunchPerformance() throws {
         measure(metrics: [XCTApplicationLaunchMetric()]) {

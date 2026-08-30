@@ -1,0 +1,623 @@
+{
+  "results": [
+    {
+      "id": 982365,
+      "image": "https://img.spoonacular.com/recipes/982365-312x231.jpg",
+      "imageType": "jpg",
+      "title": "Instant Pot Hawaiian Chicken",
+      "readyInMinutes": 18,
+      "servings": 4,
+      "sourceUrl": "https://www.pinkwhen.com/instant-pot-hawaiian-chicken-recipe/",
+      "vegetarian": false,
+      "vegan": false,
+      "glutenFree": true,
+      "dairyFree": true,
+      "veryHealthy": false,
+      "cheap": false,
+      "veryPopular": false,
+      "sustainable": false,
+      "lowFodmap": false,
+      "weightWatcherSmartPoints": 13,
+      "gaps": "no",
+      "preparationMinutes": 5,
+      "cookingMinutes": 13,
+      "aggregateLikes": 19,
+      "healthScore": 14.0,
+      "creditsText": "Jen West",
+      "license": null,
+      "sourceName": "Pink When",
+      "pricePerServing": 235.34,
+      "extendedIngredients": [
+        {
+          "id": 6150,
+          "aisle": "Condiments",
+          "image": "barbecue-sauce.jpg",
+          "consistency": "SOLID",
+          "name": "barbecue sauce",
+          "nameClean": "barbecue sauce",
+          "original": "1 (16 oz) barbecue sauce",
+          "originalName": "barbecue sauce",
+          "amount": 16.0,
+          "unit": "oz",
+          "meta": [],
+          "measures": {
+            "us": {
+              "amount": 16.0,
+              "unitShort": "oz",
+              "unitLong": "ounces"
+            },
+            "metric": {
+              "amount": 453.592,
+              "unitShort": "g",
+              "unitLong": "grams"
+            }
+          }
+        },
+        {
+          "id": 5062,
+          "aisle": "Meat",
+          "image": "chicken-breasts.png",
+          "consistency": "SOLID",
+          "name": "chicken breasts",
+          "nameClean": "chicken breasts",
+          "original": "3-4 chicken breasts",
+          "originalName": "chicken breasts",
+          "amount": 3.0,
+          "unit": "",
+          "meta": [],
+          "measures": {
+            "us": {
+              "amount": 3.0,
+              "unitShort": "",
+              "unitLong": ""
+            },
+            "metric": {
+              "amount": 3.0,
+              "unitShort": "",
+              "unitLong": ""
+            }
+          }
+        },
+        {
+          "id": 1039354,
+          "aisle": "Canned and Jarred",
+          "image": "pineapple-with-can.png",
+          "consistency": "SOLID",
+          "name": "dole pineapple tidbits",
+          "nameClean": "dole pineapple tidbits",
+          "original": "1 (20 oz) Dole Pineapple Tidbits (drained)",
+          "originalName": "Dole Pineapple Tidbits (drained)",
+          "amount": 20.0,
+          "unit": "oz",
+          "meta": [
+            "drained"
+          ],
+          "measures": {
+            "us": {
+              "amount": 20.0,
+              "unitShort": "oz",
+              "unitLong": "ounces"
+            },
+            "metric": {
+              "amount": 566.99,
+              "unitShort": "g",
+              "unitLong": "grams"
+            }
+          }
+        }
+      ],
+      "summary": "Instant Pot Hawaiian Chicken is a <b>gluten free and dairy free</b> main course. For <b>$2.35 per serving</b>, this recipe <b>covers 23%</b> of your daily requirements of vitamins and minerals. This recipe makes 4 servings with <b>473 calories</b>, <b>38g of protein</b>, and <b>5g of fat</b> each. It is brought to you by Pink When. A mixture of barbecue sauce, chicken breasts, dole pineapple tidbits, and a handful of other ingredients are all it takes to make this recipe so delicious. This recipe is liked by 19 foodies and cooks. From preparation to the plate, this recipe takes around <b>18 minutes</b>. With a spoonacular <b>score of 73%</b>, this dish is pretty good. Try <a href=\"https://spoonacular.com/recipes/instant-pot-hawaiian-chicken-1398443\">Instant Pot Hawaiian Chicken</a>, <a href=\"https://spoonacular.com/recipes/instant-pot-hawaiian-chicken-1385119\">Instant Pot Hawaiian Chicken</a>, and <a href=\"https://spoonacular.com/recipes/instant-pot-hawaiian-chicken-1326743\">Instant Pot Hawaiian Chicken</a> for similar recipes.",
+      "cuisines": [],
+      "dishTypes": [
+        "lunch",
+        "main course",
+        "main dish",
+        "dinner"
+      ],
+      "diets": [
+        "gluten free",
+        "dairy free"
+      ],
+      "occasions": [],
+      "analyzedInstructions": [
+        {
+          "name": "",
+          "steps": [
+            {
+              "number": 1,
+              "step": "First, place your trivet in the bottom of the Instant Pot and add about a cup of water (depending on the size of the Instant Pot) and a tablespoon of the pineapple juice.",
+              "ingredients": [
+                {
+                  "id": 9273,
+                  "name": "pineapple juice",
+                  "localizedName": "pineapple juice",
+                  "image": "pineapple-juice.jpg"
+                },
+                {
+                  "id": 14412,
+                  "name": "water",
+                  "localizedName": "water",
+                  "image": "water.png"
+                }
+              ],
+              "equipment": [
+                {
+                  "id": 414093,
+                  "name": "instant pot",
+                  "localizedName": "instant pot",
+                  "image": ""
+                }
+              ]
+            },
+            {
+              "number": 2,
+              "step": "Next, mix together your Dole pineapple tidbits and the barbecue sauce. Cover the chicken breasts with the barbecue pineapple mixture, and then place onto the trivet.",
+              "ingredients": [
+                {
+                  "id": 1039354,
+                  "name": "pineapple tidbits",
+                  "localizedName": "pineapple tidbits",
+                  "image": "pineapple-with-can.png"
+                },
+                {
+                  "id": 5062,
+                  "name": "chicken breast",
+                  "localizedName": "chicken breast",
+                  "image": "chicken-breasts.png"
+                },
+                {
+                  "id": 6150,
+                  "name": "barbecue sauce",
+                  "localizedName": "barbecue sauce",
+                  "image": "https://spoonacular.com/cdn/ingredients_100x100/barbecue-sauce.jpg"
+                },
+                {
+                  "id": 9266,
+                  "name": "pineapple",
+                  "localizedName": "pineapple",
+                  "image": "https://spoonacular.com/cdn/ingredients_100x100/pineapple.jpg"
+                }
+              ],
+              "equipment": []
+            },
+            {
+              "number": 3,
+              "step": "Make sure the lid is securely sealed and then place the Instant Pot on manual mode and cook with High pressure for about 13 minutes. Don't forget to place the steam valve over to \"sealing\".",
+              "ingredients": [],
+              "equipment": [
+                {
+                  "id": 414093,
+                  "name": "instant pot",
+                  "localizedName": "instant pot",
+                  "image": ""
+                }
+              ],
+              "length": {
+                "number": 13,
+                "unit": "minutes"
+              }
+            },
+            {
+              "number": 4,
+              "step": "When time is up hit cancel and allow 5-10 minutes to naturally release pressure.",
+              "ingredients": [],
+              "equipment": [],
+              "length": {
+                "number": 10,
+                "unit": "minutes"
+              }
+            },
+            {
+              "number": 5,
+              "step": "Remove your chicken from the Instant Pot with tongs and serve over a bed of rice, or for a healthier version, over a bed of lettuce.",
+              "ingredients": [
+                {
+                  "id": 0,
+                  "name": "chicken",
+                  "localizedName": "chicken",
+                  "image": "https://spoonacular.com/cdn/ingredients_100x100/whole-chicken.jpg"
+                },
+                {
+                  "id": 11252,
+                  "name": "lettuce",
+                  "localizedName": "lettuce",
+                  "image": "iceberg-lettuce.jpg"
+                },
+                {
+                  "id": 20444,
+                  "name": "rice",
+                  "localizedName": "rice",
+                  "image": "uncooked-white-rice.png"
+                }
+              ],
+              "equipment": [
+                {
+                  "id": 414093,
+                  "name": "instant pot",
+                  "localizedName": "instant pot",
+                  "image": ""
+                },
+                {
+                  "id": 404641,
+                  "name": "tongs",
+                  "localizedName": "tongs",
+                  "image": "https://spoonacular.com/cdn/equipment_100x100/tongs.jpg"
+                }
+              ]
+            }
+          ]
+        }
+      ],
+      "language": "en",
+      "spoonacularScore": 75.70153045654297,
+      "spoonacularSourceUrl": "https://spoonacular.com/instant-pot-hawaiian-chicken-982365",
+      "usedIngredientCount": 1,
+      "missedIngredientCount": 2,
+      "likes": 0,
+      "missedIngredients": [
+        {
+          "id": 6150,
+          "amount": 16.0,
+          "unit": "oz",
+          "unitLong": "ounces",
+          "unitShort": "oz",
+          "aisle": "Condiments",
+          "name": "barbecue sauce",
+          "original": "1 (16 oz) barbecue sauce",
+          "originalName": "barbecue sauce",
+          "meta": [],
+          "image": "https://img.spoonacular.com/ingredients_100x100/barbecue-sauce.jpg"
+        },
+        {
+          "id": 1039354,
+          "amount": 20.0,
+          "unit": "oz",
+          "unitLong": "ounces",
+          "unitShort": "oz",
+          "aisle": "Canned and Jarred",
+          "name": "dole pineapple tidbits",
+          "original": "1 (20 oz) Dole Pineapple Tidbits (drained)",
+          "originalName": "Dole Pineapple Tidbits (drained)",
+          "meta": [
+            "drained"
+          ],
+          "image": "https://img.spoonacular.com/ingredients_100x100/pineapple-with-can.png"
+        }
+      ],
+      "usedIngredients": [
+        {
+          "id": 5062,
+          "amount": 3.0,
+          "unit": "",
+          "unitLong": "",
+          "unitShort": "",
+          "aisle": "Meat",
+          "name": "chicken breasts",
+          "original": "3-4 chicken breasts",
+          "originalName": "chicken breasts",
+          "meta": [],
+          "image": "https://img.spoonacular.com/ingredients_100x100/chicken-breasts.png"
+        }
+      ],
+      "unusedIngredients": [
+        {
+          "id": 20444,
+          "amount": 1.0,
+          "unit": "serving",
+          "unitLong": "serving",
+          "unitShort": "serving",
+          "aisle": "Pasta and Rice",
+          "name": "rice",
+          "original": "rice",
+          "originalName": "rice",
+          "meta": [],
+          "image": "https://img.spoonacular.com/ingredients_100x100/uncooked-white-rice.png"
+        },
+        {
+          "id": 11090,
+          "amount": 1.0,
+          "unit": "serving",
+          "unitLong": "serving",
+          "unitShort": "serving",
+          "aisle": "Produce",
+          "name": "broccoli",
+          "original": "broccoli",
+          "originalName": "broccoli",
+          "meta": [],
+          "image": "https://img.spoonacular.com/ingredients_100x100/broccoli.jpg"
+        }
+      ]
+    },
+    {
+      "id": 648742,
+      "image": "https://img.spoonacular.com/recipes/648742-312x231.jpg",
+      "imageType": "jpg",
+      "title": "Kappa Maki",
+      "readyInMinutes": 45,
+      "servings": 8,
+      "sourceUrl": "https://www.foodista.com/recipe/VJ3JTZWL/kappa-maki",
+      "vegetarian": false,
+      "vegan": false,
+      "glutenFree": true,
+      "dairyFree": true,
+      "veryHealthy": false,
+      "cheap": false,
+      "veryPopular": false,
+      "sustainable": false,
+      "lowFodmap": true,
+      "weightWatcherSmartPoints": 9,
+      "gaps": "no",
+      "preparationMinutes": null,
+      "cookingMinutes": null,
+      "aggregateLikes": 1,
+      "healthScore": 19.0,
+      "creditsText": "Foodista.com \u2013 The Cooking Encyclopedia Everyone Can Edit",
+      "license": "CC BY 3.0",
+      "sourceName": "Foodista",
+      "pricePerServing": 72.94,
+      "extendedIngredients": [
+        {
+          "id": 11206,
+          "aisle": "Produce",
+          "image": "cucumber.jpg",
+          "consistency": "SOLID",
+          "name": "japanese cucumber",
+          "nameClean": "japanese cucumber",
+          "original": "2 Japanese cucumber, cut into long sticks",
+          "originalName": "Japanese cucumber, cut into long sticks",
+          "amount": 2.0,
+          "unit": "",
+          "meta": [
+            "cut into long sticks"
+          ],
+          "measures": {
+            "us": {
+              "amount": 2.0,
+              "unitShort": "",
+              "unitLong": ""
+            },
+            "metric": {
+              "amount": 2.0,
+              "unitShort": "",
+              "unitLong": ""
+            }
+          }
+        },
+        {
+          "id": 11446,
+          "aisle": "Ethnic Foods",
+          "image": "nori.jpg",
+          "consistency": "SOLID",
+          "name": "of nori",
+          "nameClean": "of nori",
+          "original": "4 inches sheets of nori (dried seaweed), cut half",
+          "originalName": "inches sheets of nori (dried seaweed), cut half",
+          "amount": 4.0,
+          "unit": "inches sheets",
+          "meta": [
+            "dried",
+            "seaweed"
+          ],
+          "measures": {
+            "us": {
+              "amount": 4.0,
+              "unitShort": "inches sheets",
+              "unitLong": "inches sheets"
+            },
+            "metric": {
+              "amount": 4.0,
+              "unitShort": "inches sheets",
+              "unitLong": "inches sheets"
+            }
+          }
+        },
+        {
+          "id": 10220054,
+          "aisle": "Pasta and Rice",
+          "image": "uncooked-white-rice.png",
+          "consistency": "SOLID",
+          "name": "sushi rice",
+          "nameClean": "sushi rice",
+          "original": "4 cups sushi rice",
+          "originalName": "sushi rice",
+          "amount": 4.0,
+          "unit": "cups",
+          "meta": [],
+          "measures": {
+            "us": {
+              "amount": 4.0,
+              "unitShort": "cups",
+              "unitLong": "cups"
+            },
+            "metric": {
+              "amount": 740.0,
+              "unitShort": "g",
+              "unitLong": "grams"
+            }
+          }
+        }
+      ],
+      "summary": "If you have around <b>45 minutes</b> to spend in the kitchen, Kappa Maki might be an awesome <b>gluten free, dairy free, lacto ovo vegetarian, and fodmap friendly</b> recipe to try. This recipe makes 8 servings with <b>352 calories</b>, <b>7g of protein</b>, and <b>1g of fat</b> each. For <b>73 cents per serving</b>, this recipe <b>covers 8%</b> of your daily requirements of vitamins and minerals. 1 person found this recipe to be scrumptious and satisfying. It works well as a side dish. A mixture of japanese cucumber, of nori, sushi rice, and a handful of other ingredients are all it takes to make this recipe so delicious. It is brought to you by Foodista. Overall, this recipe earns a <b>solid spoonacular score of 69%</b>. If you like this recipe, you might also like recipes such as <a href=\"https://spoonacular.com/recipes/kappa-maki-cucumber-sushi-roll-565133\">Kappa Maki (Cucumber Sushi Roll)</a>, <a href=\"https://spoonacular.com/recipes/live-sigma-kappa-texas-caviar-508442\">Live Sigma Kappa \u2013 Texas Caviar</a>, and <a href=\"https://spoonacular.com/recipes/live-sigma-kappa-elvis-cookies-508466\">Live Sigma Kappa \u2013 Elvis Cookies</a>.",
+      "cuisines": [],
+      "dishTypes": [
+        "side dish"
+      ],
+      "diets": [
+        "gluten free",
+        "dairy free",
+        "fodmap friendly"
+      ],
+      "occasions": [],
+      "analyzedInstructions": [
+        {
+          "name": "",
+          "steps": [
+            {
+              "number": 1,
+              "step": "Put a half-size nori on top of a bamboo mat (makisu).",
+              "ingredients": [
+                {
+                  "id": 11446,
+                  "name": "nori",
+                  "localizedName": "nori",
+                  "image": "nori.jpg"
+                }
+              ],
+              "equipment": []
+            },
+            {
+              "number": 2,
+              "step": "Spread a half cup of sushi rice on top.",
+              "ingredients": [
+                {
+                  "id": 10220054,
+                  "name": "sushi rice",
+                  "localizedName": "sushi rice",
+                  "image": "uncooked-white-rice.png"
+                },
+                {
+                  "id": 0,
+                  "name": "spread",
+                  "localizedName": "spread",
+                  "image": ""
+                }
+              ],
+              "equipment": []
+            },
+            {
+              "number": 3,
+              "step": "Place cucumber sticks lengthwise on the rice.",
+              "ingredients": [
+                {
+                  "id": 11206,
+                  "name": "cucumber",
+                  "localizedName": "cucumber",
+                  "image": "cucumber.jpg"
+                },
+                {
+                  "id": 20444,
+                  "name": "rice",
+                  "localizedName": "rice",
+                  "image": "uncooked-white-rice.png"
+                }
+              ],
+              "equipment": []
+            },
+            {
+              "number": 4,
+              "step": "Roll up the bamboo mat, pressing forward to shape the sushi into a cylinder. Press the bamboo mat firmly with hands.Unwrap the bamboo mat.",
+              "ingredients": [
+                {
+                  "id": 0,
+                  "name": "roll",
+                  "localizedName": "roll",
+                  "image": "dinner-yeast-rolls.jpg"
+                }
+              ],
+              "equipment": []
+            },
+            {
+              "number": 5,
+              "step": "Cut the sushi roll into bite-size pieces.",
+              "ingredients": [
+                {
+                  "id": 0,
+                  "name": "roll",
+                  "localizedName": "roll",
+                  "image": "dinner-yeast-rolls.jpg"
+                }
+              ],
+              "equipment": []
+            }
+          ]
+        }
+      ],
+      "language": "en",
+      "spoonacularScore": 73.25704956054688,
+      "spoonacularSourceUrl": "https://spoonacular.com/kappa-maki-648742",
+      "usedIngredientCount": 1,
+      "missedIngredientCount": 2,
+      "likes": 0,
+      "missedIngredients": [
+        {
+          "id": 11206,
+          "amount": 2.0,
+          "unit": "",
+          "unitLong": "",
+          "unitShort": "",
+          "aisle": "Produce",
+          "name": "japanese cucumber",
+          "original": "2 Japanese cucumber, cut into long sticks",
+          "originalName": "Japanese cucumber, cut into long sticks",
+          "meta": [
+            "cut into long sticks"
+          ],
+          "image": "https://img.spoonacular.com/ingredients_100x100/cucumber.jpg"
+        },
+        {
+          "id": 11446,
+          "amount": 4.0,
+          "unit": "inches sheets",
+          "unitLong": "inches sheets",
+          "unitShort": "inches sheets",
+          "aisle": "Ethnic Foods",
+          "name": "of nori",
+          "original": "4 inches sheets of nori (dried seaweed), cut half",
+          "originalName": "inches sheets of nori (dried seaweed), cut half",
+          "meta": [
+            "dried",
+            "seaweed"
+          ],
+          "extendedName": "dried of nori",
+          "image": "https://img.spoonacular.com/ingredients_100x100/nori.jpg"
+        }
+      ],
+      "usedIngredients": [
+        {
+          "id": 10220054,
+          "amount": 4.0,
+          "unit": "cups",
+          "unitLong": "cups",
+          "unitShort": "cup",
+          "aisle": "Pasta and Rice",
+          "name": "sushi rice",
+          "original": "4 cups sushi rice",
+          "originalName": "sushi rice",
+          "meta": [],
+          "image": "https://img.spoonacular.com/ingredients_100x100/uncooked-white-rice.png"
+        }
+      ],
+      "unusedIngredients": [
+        {
+          "id": 5062,
+          "amount": 1.0,
+          "unit": "serving",
+          "unitLong": "serving",
+          "unitShort": "serving",
+          "aisle": "Meat",
+          "name": "chicken breast",
+          "original": "chicken breast",
+          "originalName": "chicken breast",
+          "meta": [],
+          "image": "https://img.spoonacular.com/ingredients_100x100/chicken-breasts.png"
+        },
+        {
+          "id": 11090,
+          "amount": 1.0,
+          "unit": "serving",
+          "unitLong": "serving",
+          "unitShort": "serving",
+          "aisle": "Produce",
+          "name": "broccoli",
+          "original": "broccoli",
+          "originalName": "broccoli",
+          "meta": [],
+          "image": "https://img.spoonacular.com/ingredients_100x100/broccoli.jpg"
+        }
+      ]
+    }
+  ],
+  "offset": 0,
+  "number": 2,
+  "totalResults": 485
+}

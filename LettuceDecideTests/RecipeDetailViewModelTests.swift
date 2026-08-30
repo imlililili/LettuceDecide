@@ -32,10 +32,10 @@ struct RecipeDetailViewModelTests {
             pantryStore: InMemoryPantryStore()
         )
 
-        let kinds = viewModel.ingredientStatuses.map(\.kind)
-        #expect(kinds[0] == .have)
-        #expect(kinds[1] == .shortBy(have: 40, need: 100, unit: .grams))
-        #expect(kinds[2] == .missing)
+        let statuses = viewModel.ingredientStatuses
+        #expect(statuses.map(\.kind) == [.have, .shortBy(have: 40, unit: .grams), .missing])
+        // Every row carries the recipe's required amount + unit, never blank.
+        #expect(statuses.map(\.requiredAmount) == ["200 g", "100 g", "50 g"])
     }
 
     @Test func markAsCookedDeductsAndReportsSuccess() throws {
