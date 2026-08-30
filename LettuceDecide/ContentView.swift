@@ -7,10 +7,12 @@
 
 import SwiftUI
 
-/// Composition root: wires the real (or mock, if no API key is configured) repository,
-/// the recommendation engine, and the persisted preferences store into the view models.
+/// Composition root: wires the real (or mock, if no API key is configured) recipe
+/// repository, the persisted pantry and preferences stores, and the recommendation use
+/// case into the view models.
 struct ContentView: View {
     private let preferencesStore: UserPreferencesStoring = UserPreferencesStore()
+    private let pantryStore: PantryStoring = PantryStore()
     private let repository: RecipeRepository
 
     init() {
@@ -24,8 +26,11 @@ struct ContentView: View {
     var body: some View {
         RecommendationView(
             viewModel: RecommendationViewModel(
-                engine: RecommendationEngine(repository: repository),
-                preferencesStore: preferencesStore
+                recommendMeals: RecommendMealsFromPantryUseCase(
+                    recipeRepository: repository,
+                    pantryStore: pantryStore,
+                    preferencesStore: preferencesStore
+                )
             ),
             settingsViewModel: SettingsViewModel(store: preferencesStore)
         )

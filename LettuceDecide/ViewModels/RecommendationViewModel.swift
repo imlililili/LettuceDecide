@@ -12,20 +12,21 @@ final class RecommendationViewModel: ObservableObject {
 
     @Published private(set) var state: State = .idle
 
-    private let engine: RecommendationEngine
-    private let preferencesStore: UserPreferencesStoring
+    private let recommendMeals: RecommendMealsFromPantryUseCase
 
-    init(engine: RecommendationEngine, preferencesStore: UserPreferencesStoring) {
-        self.engine = engine
-        self.preferencesStore = preferencesStore
+    init(recommendMeals: RecommendMealsFromPantryUseCase) {
+        self.recommendMeals = recommendMeals
     }
 
     func decide() async {
         state = .loading
-        let preferences = preferencesStore.load()
         do {
-            let recipe = try await engine.recommend(matching: preferences)
-            state = .loaded(recipe)
+            let results = try await recommendMeals.execute()
+            if let top = results.first {
+                state = .loaded(top.recipe)
+            } else {
+                state = .failed(MealRecommendationError.noSafeRecipesAvailable.localizedDescription)
+            }
         } catch {
             state = .failed(error.localizedDescription)
         }
