@@ -8,7 +8,7 @@ import Foundation
 /// needs" and "an ingredient the cook owns" are different concepts that only sometimes line
 /// up, and collapsing them into one struct would hide that. `id` is Spoonacular's ingredient
 /// identifier, not a per-recipe line number.
-struct RecipeIngredient: Identifiable, Codable, Equatable {
+struct RecipeIngredient: Identifiable, Codable, Equatable, Hashable {
     let id: Int
     let name: String
     let requiredQuantity: Double
