@@ -13,16 +13,54 @@ final class LettuceDecideUITests: XCTestCase {
         continueAfterFailure = false
     }
 
+    /// Launches the app with in-memory stores so every test starts from an empty pantry
+    /// and default settings.
     @MainActor
-    func testDecideButtonShowsARecommendation() throws {
+    private func launchApp() -> XCUIApplication {
         let app = XCUIApplication()
+        app.launchArguments = ["-uiTesting"]
         app.launch()
+        return app
+    }
+
+    @MainActor
+    func testEmptyPantryPromptsToAddIngredients() throws {
+        let app = launchApp()
 
         let decideButton = app.buttons["Decide For Me"]
         XCTAssertTrue(decideButton.waitForExistence(timeout: 5))
         decideButton.tap()
 
-        // Either a recipe title or an error/retry state should appear — never an indefinite spinner.
+        // Empty pantry: the recovery action is "Add Ingredients", not a pointless retry.
+        XCTAssertTrue(app.buttons["Add Ingredients"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["Try Again"].exists)
+    }
+
+    @MainActor
+    func testAddingAPantryIngredientEnablesARecommendation() throws {
+        let app = launchApp()
+
+        XCTAssertTrue(app.buttons["Decide For Me"].waitForExistence(timeout: 5))
+        app.buttons["Decide For Me"].tap()
+
+        XCTAssertTrue(app.buttons["Add Ingredients"].waitForExistence(timeout: 10))
+        app.buttons["Add Ingredients"].tap()
+
+        XCTAssertTrue(app.navigationBars["Pantry"].waitForExistence(timeout: 5))
+        app.buttons["Add Ingredient"].firstMatch.tap()
+
+        let nameField = app.textFields["Ingredient"]
+        XCTAssertTrue(nameField.waitForExistence(timeout: 5))
+        nameField.tap()
+        nameField.typeText("chickpeas")
+        app.buttons["Save"].tap()
+
+        // Row is now in the pantry.
+        XCTAssertTrue(app.staticTexts["chickpeas"].waitForExistence(timeout: 5))
+
+        // Back to recommendations; with a stocked pantry a recipe should appear.
+        app.navigationBars["Pantry"].buttons.firstMatch.tap()
+
         let recipeTitleAppeared = app.staticTexts.matching(
             NSPredicate(format: "label CONTAINS[c] %@", "min")
         ).firstMatch.waitForExistence(timeout: 10)
@@ -31,9 +69,35 @@ final class LettuceDecideUITests: XCTestCase {
     }
 
     @MainActor
+    func testAddIngredientRejectsInvalidQuantityWithADomainMessage() throws {
+        let app = launchApp()
+
+        XCTAssertTrue(app.buttons["Pantry"].waitForExistence(timeout: 5))
+        app.buttons["Pantry"].tap()
+        XCTAssertTrue(app.navigationBars["Pantry"].waitForExistence(timeout: 5))
+        app.buttons["Add Ingredient"].firstMatch.tap()
+
+        let nameField = app.textFields["Ingredient"]
+        XCTAssertTrue(nameField.waitForExistence(timeout: 5))
+        nameField.tap()
+        nameField.typeText("rice")
+
+        let quantityField = app.textFields["Quantity"]
+        quantityField.clearText()
+        quantityField.typeText("0")
+
+        app.buttons["Save"].tap()
+
+        XCTAssertTrue(
+            app.staticTexts.matching(
+                NSPredicate(format: "label CONTAINS[c] %@", "greater than zero")
+            ).firstMatch.waitForExistence(timeout: 5)
+        )
+    }
+
+    @MainActor
     func testSettingsSheetOpensAndCloses() throws {
-        let app = XCUIApplication()
-        app.launch()
+        let app = launchApp()
 
         app.buttons["Settings"].tap()
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 5))
@@ -44,8 +108,7 @@ final class LettuceDecideUITests: XCTestCase {
 
     @MainActor
     func testTogglingAnAllergenPersistsAfterReopeningSettings() throws {
-        let app = XCUIApplication()
-        app.launch()
+        let app = launchApp()
 
         app.buttons["Settings"].tap()
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 5))
@@ -66,7 +129,9 @@ final class LettuceDecideUITests: XCTestCase {
     @MainActor
     func testLaunchPerformance() throws {
         measure(metrics: [XCTApplicationLaunchMetric()]) {
-            XCUIApplication().launch()
+            let app = XCUIApplication()
+            app.launchArguments = ["-uiTesting"]
+            app.launch()
         }
     }
 }
@@ -77,5 +142,12 @@ extension XCUIElement {
     /// where the switch itself sits.
     func flipSwitch() {
         coordinate(withNormalizedOffset: CGVector(dx: 0.9, dy: 0.5)).tap()
+    }
+
+    /// Focuses the field and deletes whatever it currently contains.
+    func clearText() {
+        tap()
+        let current = (value as? String) ?? ""
+        typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: current.count))
     }
 }
