@@ -1,40 +1,32 @@
+import Foundation
 import Testing
 @testable import LettuceDecide
 
 struct MockRecipeRepositoryTests {
-    @Test func fetchExcludesRequestedIDsWhenAlternativesExist() async throws {
+    @Test func findRecipesReturnsConfiguredCandidates() async throws {
         let repo = MockRecipeRepository()
-        let excluded = Set(MockRecipeRepository.sampleRecipes.dropLast().map(\.id))
 
-        let recipe = try await repo.fetchRandomRecipe(matching: .default, excluding: excluded)
+        let candidates = try await repo.findRecipes(usingPantryNames: ["chickpeas"], matching: .default)
 
-        #expect(recipe.id == MockRecipeRepository.sampleRecipes.last?.id)
+        #expect(candidates.count == MockRecipeRepository.sampleCandidates.count)
     }
 
-    @Test func fetchFallsBackToFirstRecipeWhenAllAreExcluded() async throws {
-        let repo = MockRecipeRepository()
-        let allIDs = Set(MockRecipeRepository.sampleRecipes.map(\.id))
-
-        let recipe = try await repo.fetchRandomRecipe(matching: .default, excluding: allIDs)
-
-        #expect(recipe.id == MockRecipeRepository.sampleRecipes.first?.id)
-    }
-
-    @Test func fetchThrowsWhenNoRecipesAreConfigured() async {
-        let repo = MockRecipeRepository(fixedRecipes: [])
-
-        await #expect(throws: RecipeRepositoryError.self) {
-            _ = try await repo.fetchRandomRecipe(matching: .default, excluding: [])
-        }
-    }
-
-    @Test func fetchRecordsTheLastRequestedPreferences() async throws {
+    @Test func findRecipesRecordsTheRequest() async throws {
         let repo = MockRecipeRepository()
         var prefs = UserPreferences.default
-        prefs.excludedIngredients = ["cilantro"]
+        prefs.intolerances = [.dairy]
 
-        _ = try await repo.fetchRandomRecipe(matching: prefs, excluding: [])
+        _ = try await repo.findRecipes(usingPantryNames: ["milk", "flour"], matching: prefs)
 
+        #expect(repo.lastRequestedPantryNames == ["milk", "flour"])
         #expect(repo.lastRequestedPreferences == prefs)
+    }
+
+    @Test func findRecipesThrowsTheConfiguredError() async {
+        let repo = MockRecipeRepository(errorToThrow: RecipeRepositoryError.noResultsFound)
+
+        await #expect(throws: RecipeRepositoryError.self) {
+            _ = try await repo.findRecipes(usingPantryNames: [], matching: .default)
+        }
     }
 }

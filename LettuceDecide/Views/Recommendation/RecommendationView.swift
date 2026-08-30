@@ -80,8 +80,14 @@ struct RecommendationView: View {
 #Preview {
     RecommendationView(
         viewModel: RecommendationViewModel(
-            engine: RecommendationEngine(repository: MockRecipeRepository()),
-            preferencesStore: InMemoryUserPreferencesStore()
+            recommendMeals: RecommendMealsFromPantryUseCase(
+                recipeRepository: MockRecipeRepository(),
+                pantryStore: InMemoryPantryStore(initial: [
+                    PantryIngredient(ingredientName: "chickpeas", quantity: 400, unit: .grams, storageLocation: .pantry),
+                    PantryIngredient(ingredientName: "spinach", quantity: 200, unit: .grams, storageLocation: .fridge),
+                ]),
+                preferencesStore: InMemoryUserPreferencesStore()
+            )
         ),
         settingsViewModel: SettingsViewModel(store: InMemoryUserPreferencesStore())
     )
