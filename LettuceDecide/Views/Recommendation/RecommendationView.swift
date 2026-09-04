@@ -6,19 +6,23 @@ struct RecommendationView: View {
     @StateObject private var viewModel: RecommendationViewModel
     @StateObject private var settingsViewModel: SettingsViewModel
     @StateObject private var pantryViewModel: PantryViewModel
+    @StateObject private var weeklyPlannerViewModel: WeeklyPlannerViewModel
     private let pantryStore: PantryStoring
     @State private var showingSettings = false
     @State private var showingPantry = false
+    @State private var showingWeeklyPlanner = false
 
     init(
         viewModel: @autoclosure @escaping () -> RecommendationViewModel,
         settingsViewModel: @autoclosure @escaping () -> SettingsViewModel,
         pantryViewModel: @autoclosure @escaping () -> PantryViewModel,
+        weeklyPlannerViewModel: @autoclosure @escaping () -> WeeklyPlannerViewModel,
         pantryStore: PantryStoring
     ) {
         _viewModel = StateObject(wrappedValue: viewModel())
         _settingsViewModel = StateObject(wrappedValue: settingsViewModel())
         _pantryViewModel = StateObject(wrappedValue: pantryViewModel())
+        _weeklyPlannerViewModel = StateObject(wrappedValue: weeklyPlannerViewModel())
         self.pantryStore = pantryStore
     }
 
@@ -37,6 +41,14 @@ struct RecommendationView: View {
                     }
                     ToolbarItem(placement: .topBarTrailing) {
                         Button {
+                            showingWeeklyPlanner = true
+                        } label: {
+                            Image(systemName: "calendar")
+                        }
+                        .accessibilityLabel("Weekly Planner")
+                    }
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button {
                             showingSettings = true
                         } label: {
                             Image(systemName: "slider.horizontal.3")
@@ -46,6 +58,9 @@ struct RecommendationView: View {
                 }
                 .navigationDestination(isPresented: $showingPantry) {
                     PantryView(viewModel: pantryViewModel)
+                }
+                .navigationDestination(isPresented: $showingWeeklyPlanner) {
+                    WeeklyPlannerView(viewModel: weeklyPlannerViewModel)
                 }
                 .sheet(isPresented: $showingSettings) {
                     SettingsView(viewModel: settingsViewModel)
@@ -58,6 +73,14 @@ struct RecommendationView: View {
                 .onChange(of: showingPantry) { _, isShowing in
                     // Returning from the pantry: the inventory may have changed, so refresh.
                     if !isShowing {
+                        Task { await viewModel.decide() }
+                    }
+                }
+                .onChange(of: showingWeeklyPlanner) { _, isShowing in
+                    // The planner can lead to cooking a recipe, which deducts from the
+                    // pantry — refresh on the way back.
+                    if !isShowing {
+                        pantryViewModel.reload()
                         Task { await viewModel.decide() }
                     }
                 }
@@ -117,6 +140,15 @@ struct RecommendationView: View {
         ),
         settingsViewModel: SettingsViewModel(store: preferencesStore),
         pantryViewModel: PantryViewModel(store: pantryStore),
+        weeklyPlannerViewModel: WeeklyPlannerViewModel(
+            recordBusyness: RecordBusynessUseCase(store: InMemoryScheduleStore()),
+            generatePlan: GenerateWeeklyMealPlanUseCase(
+                recipeRepository: MockRecipeRepository(),
+                pantryStore: pantryStore,
+                preferencesStore: preferencesStore
+            ),
+            pantryStore: pantryStore
+        ),
         pantryStore: pantryStore
     )
 }

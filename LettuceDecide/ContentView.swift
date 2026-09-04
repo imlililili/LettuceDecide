@@ -13,6 +13,7 @@ import SwiftUI
 struct ContentView: View {
     private let preferencesStore: UserPreferencesStoring
     private let pantryStore: PantryStoring
+    private let scheduleStore: ScheduleStoring
     private let repository: RecipeRepository
 
     init() {
@@ -25,6 +26,7 @@ struct ContentView: View {
 
         preferencesStore = scratchStores ? InMemoryUserPreferencesStore() : UserPreferencesStore()
         pantryStore = scratchStores ? InMemoryPantryStore() : PantryStore()
+        scheduleStore = scratchStores ? InMemoryScheduleStore() : ScheduleStore()
 
         if !uiTesting, Config.spoonacularAPIKey != nil {
             repository = SpoonacularRecipeRepository()
@@ -44,6 +46,15 @@ struct ContentView: View {
             ),
             settingsViewModel: SettingsViewModel(store: preferencesStore),
             pantryViewModel: PantryViewModel(store: pantryStore),
+            weeklyPlannerViewModel: WeeklyPlannerViewModel(
+                recordBusyness: RecordBusynessUseCase(store: scheduleStore),
+                generatePlan: GenerateWeeklyMealPlanUseCase(
+                    recipeRepository: repository,
+                    pantryStore: pantryStore,
+                    preferencesStore: preferencesStore
+                ),
+                pantryStore: pantryStore
+            ),
             pantryStore: pantryStore
         )
     }

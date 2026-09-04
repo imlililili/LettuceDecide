@@ -162,6 +162,40 @@ final class LettuceDecideUITests: XCTestCase {
         XCTAssertNotEqual(reopenedToggle.value as? String, initialValue)
     }
 
+    @MainActor
+    func testWeeklyPlannerGeneratesAPlanFromBusyness() throws {
+        let app = launchApp()
+
+        // Stock the pantry so the planner has something to work with.
+        XCTAssertTrue(app.buttons["Add Ingredients"].waitForExistence(timeout: 10))
+        app.buttons["Add Ingredients"].tap()
+        XCTAssertTrue(app.navigationBars["Pantry"].waitForExistence(timeout: 5))
+        app.buttons["Add Ingredient"].firstMatch.tap()
+        let nameField = app.textFields["Ingredient"]
+        XCTAssertTrue(nameField.waitForExistence(timeout: 5))
+        nameField.tap()
+        nameField.typeText("chickpeas")
+        app.buttons["Save"].tap()
+        XCTAssertTrue(app.staticTexts["chickpeas"].waitForExistence(timeout: 5))
+        app.navigationBars["Pantry"].buttons.firstMatch.tap()
+
+        // Open the planner, generate, land on the result screen.
+        XCTAssertTrue(app.buttons["Weekly Planner"].waitForExistence(timeout: 10))
+        app.buttons["Weekly Planner"].tap()
+        XCTAssertTrue(app.navigationBars["Weekly Planner"].waitForExistence(timeout: 5))
+
+        app.buttons["Generate This Week's Plan"].tap()
+
+        XCTAssertTrue(app.navigationBars["This Week's Plan"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Chickpea and Spinach Curry"].waitForExistence(timeout: 5))
+        // With only the three mock recipes, some days honestly have no match.
+        XCTAssertTrue(
+            app.staticTexts.matching(
+                NSPredicate(format: "label CONTAINS[c] %@", "No match this busy")
+            ).firstMatch.exists
+        )
+    }
+
     /// End-to-end check that the app is talking to the real Spoonacular API (real key in
     /// the app bundle, no -uiTesting flag). Skipped unless run with
     /// `TEST_RUNNER_RUN_LIVE_API_TESTS=1`, so CI (which has no key) doesn't fail on it.
