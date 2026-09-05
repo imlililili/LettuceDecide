@@ -29,7 +29,11 @@ struct ContentView: View {
         scheduleStore = scratchStores ? InMemoryScheduleStore() : ScheduleStore()
 
         if !uiTesting, Config.spoonacularAPIKey != nil {
-            repository = SpoonacularRecipeRepository()
+            // The real API sits behind a cache so an unreachable network falls back to the
+            // last good result instead of an error. A scratch launch uses an in-memory cache
+            // so it can't be primed by a previous run.
+            let cache: RecipeCacheStoring = scratchStores ? InMemoryRecipeCacheStore() : RecipeCacheStore()
+            repository = CachingRecipeRepository(wrapping: SpoonacularRecipeRepository(), cache: cache)
         } else {
             repository = MockRecipeRepository()
         }

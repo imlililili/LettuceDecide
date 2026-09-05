@@ -21,6 +21,9 @@ struct PantryMatchResult: Identifiable, Equatable {
     /// Whether at least one matched pantry line is expiring soon or already expired —
     /// the signal the ranking uses to float "use it up" recipes to the top.
     let usesExpiringIngredients: Bool
+    /// `true` when the underlying recipe data came from the offline cache rather than a live
+    /// fetch. The UI surfaces this so a stale suggestion is never shown as if it were current.
+    var isFromCache: Bool = false
 
     /// Fraction of the recipe's ingredients the cook already has, 0...1.
     var matchPercentage: Double {

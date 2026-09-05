@@ -28,20 +28,25 @@ struct RecommendationView: View {
         case .idle, .loading:
             LoadingView(message: "Finding recipes you can make…")
         case .loaded(let results):
-            List(results) { result in
-                NavigationLink {
-                    RecipeDetailView(
-                        viewModel: RecipeDetailViewModel(result: result, pantryStore: pantryStore),
-                        onCooked: {
-                            Task { await viewModel.decide() }
-                        }
-                    )
-                } label: {
-                    RecommendationRow(result: result)
+            VStack(spacing: 0) {
+                if results.first?.isFromCache == true {
+                    StaleResultsNotice()
                 }
+                List(results) { result in
+                    NavigationLink {
+                        RecipeDetailView(
+                            viewModel: RecipeDetailViewModel(result: result, pantryStore: pantryStore),
+                            onCooked: {
+                                Task { await viewModel.decide() }
+                            }
+                        )
+                    } label: {
+                        RecommendationRow(result: result)
+                    }
+                }
+                .listStyle(.plain)
+                .refreshable { await viewModel.decide() }
             }
-            .listStyle(.plain)
-            .refreshable { await viewModel.decide() }
         case .failed(let failure):
             ErrorStateView(
                 message: failure.message,

@@ -26,4 +26,7 @@ struct WeeklyMealPlan: Equatable {
     let days: [DayMealPlan]
     /// Missing ingredients aggregated across every assigned day, deduped by name + unit.
     let shoppingList: [ShoppingListItem]
+    /// `true` when the candidate pool came from the offline cache rather than a live fetch.
+    /// The Week Plan screen surfaces this so a stale plan is never shown as if it were current.
+    var isFromCache: Bool = false
 }

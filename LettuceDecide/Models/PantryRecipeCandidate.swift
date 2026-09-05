@@ -8,10 +8,14 @@ import Foundation
 /// ingredient names is exactly the kind of fuzzy problem this app defers to Spoonacular
 /// rather than re-implementing. `PantryMatcher` only maps the "used" names back onto real
 /// pantry lines (for expiry) and ranks the results.
-struct PantryRecipeCandidate: Equatable {
+struct PantryRecipeCandidate: Equatable, Codable {
     let recipe: Recipe
     /// Names of the supplied pantry ingredients this recipe uses, as the service tags them.
     let usedIngredientNames: [String]
     /// Ingredients the recipe needs beyond what was supplied.
     let missedIngredients: [RecipeIngredient]
+    /// `true` when this candidate was served from the on-disk cache because the network was
+    /// unreachable — not live data. Batch-level: every candidate in one response carries the
+    /// same value. Defaults to `false` (a fresh fetch); the cache decorator flips it.
+    var isFromCache: Bool = false
 }

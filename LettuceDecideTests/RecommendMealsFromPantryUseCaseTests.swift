@@ -94,6 +94,22 @@ struct RecommendMealsFromPantryUseCaseTests {
         #expect(results.first?.usesExpiringIngredients == true)
     }
 
+    @Test func recommendMeals_flagsResults_whenCandidatesCameFromTheCache() async throws {
+        var cached = candidate(1, allergens: [])
+        cached.isFromCache = true
+        let useCase = makeUseCase(
+            pantry: [PantryIngredient(ingredientName: "onion", quantity: 2, unit: .pieces, storageLocation: .pantry)],
+            candidates: [cached, candidate(2, allergens: [])]
+        )
+
+        let results = try await useCase.execute(now: today)
+
+        let anyFromCache = results.contains { $0.isFromCache }
+        let recipeTwo = results.first { $0.recipe.id == 2 }
+        #expect(anyFromCache)
+        #expect(recipeTwo?.isFromCache == false)
+    }
+
     @Test func recommendMeals_wrapsServiceErrors() async {
         let useCase = makeUseCase(
             pantry: [PantryIngredient(ingredientName: "onion", quantity: 2, unit: .pieces, storageLocation: .pantry)],

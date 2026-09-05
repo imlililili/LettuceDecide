@@ -24,6 +24,19 @@ struct PantryMatcherTests {
         #expect(result.first?.matchedIngredients.map(\.ingredientName) == ["Tomatoes"])
     }
 
+    @Test func carriesTheCandidateCacheFlagOntoEachResult() {
+        let fresh = PantryRecipeCandidate(recipe: recipe(1), usedIngredientNames: [], missedIngredients: [])
+        var cached = PantryRecipeCandidate(recipe: recipe(2), usedIngredientNames: [], missedIngredients: [])
+        cached.isFromCache = true
+
+        let results = PantryMatcher().match(candidates: [fresh, cached], against: [], now: today)
+
+        let freshResult = results.first { $0.recipe.id == 1 }
+        let cachedResult = results.first { $0.recipe.id == 2 }
+        #expect(freshResult?.isFromCache == false)
+        #expect(cachedResult?.isFromCache == true)
+    }
+
     @Test func matchPercentageIsMatchedOverMatchedPlusMissing() {
         let pantry = [PantryIngredient(ingredientName: "egg", quantity: 6, unit: .pieces, storageLocation: .fridge)]
         let candidate = PantryRecipeCandidate(

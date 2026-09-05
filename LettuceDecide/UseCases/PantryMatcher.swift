@@ -33,7 +33,8 @@ struct PantryMatcher {
             recipe: candidate.recipe,
             matchedIngredients: matched,
             missingIngredients: candidate.missedIngredients,
-            usesExpiringIngredients: usesExpiring
+            usesExpiringIngredients: usesExpiring,
+            isFromCache: candidate.isFromCache
         )
     }
 
