@@ -51,8 +51,8 @@ final class LettuceDecideUITests: XCTestCase {
 
         XCTAssertTrue(app.staticTexts["chickpeas"].waitForExistence(timeout: 5))
 
-        // Back to recommendations; with a stocked pantry the ranked list appears.
-        app.navigationBars["Pantry"].buttons.firstMatch.tap()
+        // Back to the Decide tab; a previously failed load retries now the pantry is stocked.
+        app.tabBars.buttons["Decide"].tap()
 
         XCTAssertTrue(app.staticTexts["Chickpea and Spinach Curry"].waitForExistence(timeout: 10))
         XCTAssertTrue(
@@ -60,6 +60,44 @@ final class LettuceDecideUITests: XCTestCase {
                 NSPredicate(format: "label CONTAINS[c] %@", "of ingredients in your pantry")
             ).firstMatch.exists
         )
+    }
+
+    /// Problem 1: once recommendations are loaded, changing the pantry and returning to the
+    /// Decide tab must NOT silently refetch. The curry row's match percentage would jump
+    /// from 50% (has chickpeas, missing spinach) to 67% (has both) if it re-ran the matcher.
+    @MainActor
+    func testAddingPantryIngredientDoesNotSilentlyRefetchRecommendations() throws {
+        let app = launchApp()
+
+        // Load recommendations with just chickpeas.
+        XCTAssertTrue(app.buttons["Add Ingredients"].waitForExistence(timeout: 10))
+        app.buttons["Add Ingredients"].tap()
+        XCTAssertTrue(app.navigationBars["Pantry"].waitForExistence(timeout: 5))
+        addIngredient(app, name: "chickpeas")
+        app.tabBars.buttons["Decide"].tap()
+
+        XCTAssertTrue(app.staticTexts["Chickpea and Spinach Curry"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["50% of ingredients in your pantry"].waitForExistence(timeout: 5))
+
+        // Add the missing ingredient, then come back.
+        app.tabBars.buttons["Pantry"].tap()
+        addIngredient(app, name: "spinach")
+        app.tabBars.buttons["Decide"].tap()
+
+        // Still the pre-existing 50% result — no background refetch to 67%.
+        XCTAssertTrue(app.staticTexts["50% of ingredients in your pantry"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["67% of ingredients in your pantry"].exists)
+    }
+
+    @MainActor
+    private func addIngredient(_ app: XCUIApplication, name: String) {
+        app.buttons["Add Ingredient"].firstMatch.tap()
+        let nameField = app.textFields["Ingredient"]
+        XCTAssertTrue(nameField.waitForExistence(timeout: 5))
+        nameField.tap()
+        nameField.typeText(name)
+        app.buttons["Save"].tap()
+        XCTAssertTrue(app.staticTexts[name].waitForExistence(timeout: 5))
     }
 
     @MainActor
@@ -81,7 +119,7 @@ final class LettuceDecideUITests: XCTestCase {
         quantityField.typeText("1000")
         app.buttons["Save"].tap()
 
-        app.navigationBars["Pantry"].buttons.firstMatch.tap()
+        app.tabBars.buttons["Decide"].tap()
 
         let curry = app.staticTexts["Chickpea and Spinach Curry"]
         XCTAssertTrue(curry.waitForExistence(timeout: 10))
@@ -96,7 +134,7 @@ final class LettuceDecideUITests: XCTestCase {
         ok.tap()
 
         // Curry needs 400g chickpeas; 1000 - 400 = 600 should remain.
-        app.buttons["Pantry"].tap()
+        app.tabBars.buttons["Pantry"].tap()
         XCTAssertTrue(
             app.staticTexts.matching(
                 NSPredicate(format: "label CONTAINS %@", "600")
@@ -108,8 +146,8 @@ final class LettuceDecideUITests: XCTestCase {
     func testAddIngredientRejectsInvalidQuantityWithADomainMessage() throws {
         let app = launchApp()
 
-        XCTAssertTrue(app.buttons["Pantry"].waitForExistence(timeout: 5))
-        app.buttons["Pantry"].tap()
+        XCTAssertTrue(app.tabBars.buttons["Pantry"].waitForExistence(timeout: 5))
+        app.tabBars.buttons["Pantry"].tap()
         XCTAssertTrue(app.navigationBars["Pantry"].waitForExistence(timeout: 5))
         app.buttons["Add Ingredient"].firstMatch.tap()
 
@@ -132,21 +170,19 @@ final class LettuceDecideUITests: XCTestCase {
     }
 
     @MainActor
-    func testSettingsSheetOpensAndCloses() throws {
+    func testSettingsTabShowsDietaryPreferences() throws {
         let app = launchApp()
 
-        app.buttons["Settings"].tap()
+        app.tabBars.buttons["Settings"].tap()
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 5))
-
-        app.buttons["Done"].tap()
-        XCTAssertFalse(app.navigationBars["Settings"].waitForExistence(timeout: 2))
+        XCTAssertTrue(app.switches["Dairy"].waitForExistence(timeout: 5))
     }
 
     @MainActor
-    func testTogglingAnAllergenPersistsAfterReopeningSettings() throws {
+    func testTogglingAnAllergenPersistsAcrossTabSwitches() throws {
         let app = launchApp()
 
-        app.buttons["Settings"].tap()
+        app.tabBars.buttons["Settings"].tap()
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 5))
 
         let dairyToggle = app.switches["Dairy"]
@@ -154,8 +190,9 @@ final class LettuceDecideUITests: XCTestCase {
         let initialValue = dairyToggle.value as? String
         dairyToggle.flipSwitch()
 
-        app.buttons["Done"].tap()
-        app.buttons["Settings"].tap()
+        // Leave and come back to the Settings tab.
+        app.tabBars.buttons["Decide"].tap()
+        app.tabBars.buttons["Settings"].tap()
 
         let reopenedToggle = app.switches["Dairy"]
         XCTAssertTrue(reopenedToggle.waitForExistence(timeout: 5))
@@ -177,11 +214,9 @@ final class LettuceDecideUITests: XCTestCase {
         nameField.typeText("chickpeas")
         app.buttons["Save"].tap()
         XCTAssertTrue(app.staticTexts["chickpeas"].waitForExistence(timeout: 5))
-        app.navigationBars["Pantry"].buttons.firstMatch.tap()
 
-        // Open the planner, generate, land on the result screen.
-        XCTAssertTrue(app.buttons["Weekly Planner"].waitForExistence(timeout: 10))
-        app.buttons["Weekly Planner"].tap()
+        // Open the Calendar tab, generate, land on the result screen.
+        app.tabBars.buttons["Calendar"].tap()
         XCTAssertTrue(app.navigationBars["Weekly Planner"].waitForExistence(timeout: 5))
 
         app.buttons["Generate This Week's Plan"].tap()
@@ -225,7 +260,7 @@ final class LettuceDecideUITests: XCTestCase {
             XCTAssertTrue(app.staticTexts[ingredient].waitForExistence(timeout: 5))
         }
 
-        app.navigationBars["Pantry"].buttons.firstMatch.tap()
+        app.tabBars.buttons["Decide"].tap()
 
         // The list should load real recipes — never the three fixed mock titles.
         let mockTitles = ["Lemon Garlic Roasted Salmon", "Chickpea and Spinach Curry", "Classic Margherita Pizza"]

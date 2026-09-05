@@ -3,11 +3,7 @@ import SwiftUI
 /// Input screen for the weekly planner: pick a busyness level for each of the seven days,
 /// then generate a plan against the current pantry.
 struct WeeklyPlannerView: View {
-    @StateObject private var viewModel: WeeklyPlannerViewModel
-
-    init(viewModel: @autoclosure @escaping () -> WeeklyPlannerViewModel) {
-        _viewModel = StateObject(wrappedValue: viewModel())
-    }
+    @ObservedObject var viewModel: WeeklyPlannerViewModel
 
     var body: some View {
         Form {
