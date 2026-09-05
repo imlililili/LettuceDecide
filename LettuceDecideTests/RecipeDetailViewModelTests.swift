@@ -8,29 +8,17 @@ struct RecipeDetailViewModelTests {
         Recipe(id: 1, title: "Test Dish", requiredIngredients: required)
     }
 
-    private func result(recipe: Recipe, matched: [PantryIngredient]) -> PantryMatchResult {
-        PantryMatchResult(
-            id: recipe.id,
-            recipe: recipe,
-            matchedIngredients: matched,
-            missingIngredients: [],
-            usesExpiringIngredients: false
-        )
-    }
-
-    @Test func ingredientStatusesClassifyHaveShortAndMissing() {
+    @Test func ingredientStatusesClassifyHaveShortAndMissingFromCurrentPantry() {
         let cooked = recipe([
             RecipeIngredient(id: 1, name: "flour", requiredQuantity: 200, unit: .grams),
             RecipeIngredient(id: 2, name: "sugar", requiredQuantity: 100, unit: .grams),
             RecipeIngredient(id: 3, name: "butter", requiredQuantity: 50, unit: .grams),
         ])
-        let viewModel = RecipeDetailViewModel(
-            result: result(recipe: cooked, matched: [
-                PantryIngredient(ingredientName: "flour", quantity: 500, unit: .grams, storageLocation: .pantry),
-                PantryIngredient(ingredientName: "sugar", quantity: 40, unit: .grams, storageLocation: .pantry),
-            ]),
-            pantryStore: InMemoryPantryStore()
-        )
+        let store = InMemoryPantryStore(initial: [
+            PantryIngredient(ingredientName: "flour", quantity: 500, unit: .grams, storageLocation: .pantry),
+            PantryIngredient(ingredientName: "sugar", quantity: 40, unit: .grams, storageLocation: .pantry),
+        ])
+        let viewModel = RecipeDetailViewModel(recipe: cooked, pantryStore: store)
 
         let statuses = viewModel.ingredientStatuses
         #expect(statuses.map(\.kind) == [.have, .shortBy(have: 40, unit: .grams), .missing])
@@ -38,14 +26,32 @@ struct RecipeDetailViewModelTests {
         #expect(statuses.map(\.requiredAmount) == ["200 g", "100 g", "50 g"])
     }
 
+    @Test func ingredientStatusesReReflectThePantryAfterItChanges() {
+        let cooked = recipe([
+            RecipeIngredient(id: 1, name: "flour", requiredQuantity: 200, unit: .grams),
+            RecipeIngredient(id: 2, name: "sugar", requiredQuantity: 100, unit: .grams),
+        ])
+        let store = InMemoryPantryStore(initial: [
+            PantryIngredient(ingredientName: "flour", quantity: 500, unit: .grams, storageLocation: .pantry)
+        ])
+        let viewModel = RecipeDetailViewModel(recipe: cooked, pantryStore: store)
+        #expect(viewModel.ingredientStatuses.map(\.kind) == [.have, .missing])
+
+        // The cook adds the missing ingredient elsewhere; the checklist catches up with no
+        // manual reload.
+        store.save(store.load() + [
+            PantryIngredient(ingredientName: "sugar", quantity: 60, unit: .grams, storageLocation: .pantry)
+        ])
+
+        #expect(viewModel.ingredientStatuses.map(\.kind) == [.have, .shortBy(have: 60, unit: .grams)])
+    }
+
     @Test func markAsCookedDeductsAndReportsSuccess() throws {
-        let flour = PantryIngredient(ingredientName: "flour", quantity: 500, unit: .grams, storageLocation: .pantry)
-        let store = InMemoryPantryStore(initial: [flour])
+        let store = InMemoryPantryStore(initial: [
+            PantryIngredient(ingredientName: "flour", quantity: 500, unit: .grams, storageLocation: .pantry)
+        ])
         let viewModel = RecipeDetailViewModel(
-            result: result(
-                recipe: recipe([RecipeIngredient(id: 1, name: "flour", requiredQuantity: 200, unit: .grams)]),
-                matched: [flour]
-            ),
+            recipe: recipe([RecipeIngredient(id: 1, name: "flour", requiredQuantity: 200, unit: .grams)]),
             pantryStore: store
         )
 
@@ -56,13 +62,11 @@ struct RecipeDetailViewModelTests {
     }
 
     @Test func markAsCookedSurfacesInsufficientQuantityWithoutSaving() {
-        let flour = PantryIngredient(ingredientName: "flour", quantity: 100, unit: .grams, storageLocation: .pantry)
-        let store = InMemoryPantryStore(initial: [flour])
+        let store = InMemoryPantryStore(initial: [
+            PantryIngredient(ingredientName: "flour", quantity: 100, unit: .grams, storageLocation: .pantry)
+        ])
         let viewModel = RecipeDetailViewModel(
-            result: result(
-                recipe: recipe([RecipeIngredient(id: 1, name: "flour", requiredQuantity: 250, unit: .grams)]),
-                matched: [flour]
-            ),
+            recipe: recipe([RecipeIngredient(id: 1, name: "flour", requiredQuantity: 250, unit: .grams)]),
             pantryStore: store
         )
 

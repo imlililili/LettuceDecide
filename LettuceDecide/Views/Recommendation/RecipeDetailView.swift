@@ -215,17 +215,11 @@ private struct IngredientStatusRow: View {
     NavigationStack {
         RecipeDetailView(
             viewModel: RecipeDetailViewModel(
-                result: PantryMatchResult(
-                    id: 2,
-                    recipe: MockRecipeRepository.sampleRecipes[1],
-                    matchedIngredients: [
-                        PantryIngredient(ingredientName: "chickpeas", quantity: 200, unit: .grams, storageLocation: .pantry),
-                        PantryIngredient(ingredientName: "spinach", quantity: 200, unit: .grams, storageLocation: .fridge),
-                    ],
-                    missingIngredients: [RecipeIngredient(id: 9, name: "curry powder", requiredQuantity: 1, unit: .tablespoons)],
-                    usesExpiringIngredients: false
-                ),
-                pantryStore: InMemoryPantryStore()
+                recipe: MockRecipeRepository.sampleRecipes[1],
+                pantryStore: InMemoryPantryStore(initial: [
+                    PantryIngredient(ingredientName: "chickpeas", quantity: 200, unit: .grams, storageLocation: .pantry),
+                    PantryIngredient(ingredientName: "spinach", quantity: 200, unit: .grams, storageLocation: .fridge),
+                ])
             ),
             onCooked: {}
         )

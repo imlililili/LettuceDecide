@@ -23,9 +23,16 @@ struct IngredientStatus: Identifiable, Equatable {
 
 @MainActor
 final class RecipeDetailViewModel: ObservableObject {
-    let result: PantryMatchResult
+    let recipe: Recipe
 
+    private let pantryStore: PantryStoring
     private let updateInventory: UpdateInventoryAfterCookingUseCase
+    private var pantryChangeCancellable: AnyCancellable?
+
+    /// The pantry as it stands now. Refreshed whenever the store announces a change, so the
+    /// checklist re-derives against live inventory — if the cook adds a missing ingredient
+    /// on the Pantry tab and comes back, the ticks are already right.
+    @Published private var pantry: [PantryIngredient]
 
     @Published var cookAlert: CookAlert?
 
@@ -37,27 +44,41 @@ final class RecipeDetailViewModel: ObservableObject {
         let didCook: Bool
     }
 
-    init(result: PantryMatchResult, pantryStore: PantryStoring) {
-        self.result = result
+    init(recipe: Recipe, pantryStore: PantryStoring) {
+        self.recipe = recipe
+        self.pantryStore = pantryStore
         self.updateInventory = UpdateInventoryAfterCookingUseCase(store: pantryStore)
+        self.pantry = pantryStore.load()
+        pantryChangeCancellable = pantryStore.changes
+            .sink { [weak self] in
+                MainActor.assumeIsolated {
+                    guard let self else { return }
+                    self.pantry = self.pantryStore.load()
+                }
+            }
     }
 
-    var recipe: Recipe { result.recipe }
+    /// The recipe matched against the current pantry — recomputed on every access, so it
+    /// always reflects `pantry` as it stands.
+    private var currentMatch: PantryMatchResult {
+        .matching(recipe, against: pantry)
+    }
 
     var ingredientStatuses: [IngredientStatus] {
-        recipe.requiredIngredients.enumerated().map { index, required in
+        let matched = currentMatch.matchedIngredients
+        return recipe.requiredIngredients.enumerated().map { index, required in
             IngredientStatus(
                 id: index,
                 name: required.name,
                 requiredAmount: "\(number(required.requiredQuantity)) \(required.unit.displayName)",
-                kind: kind(for: required)
+                kind: kind(for: required, ownedLines: matched)
             )
         }
     }
 
     func markAsCooked() {
         do {
-            let outcome = try updateInventory.execute(result)
+            let outcome = try updateInventory.execute(currentMatch)
             cookAlert = CookAlert(title: "Marked as cooked", message: message(for: outcome), didCook: true)
         } catch let error as InventoryUpdateError {
             cookAlert = CookAlert(
@@ -70,9 +91,9 @@ final class RecipeDetailViewModel: ObservableObject {
         }
     }
 
-    private func kind(for required: RecipeIngredient) -> IngredientStatus.Kind {
+    private func kind(for required: RecipeIngredient, ownedLines: [PantryIngredient]) -> IngredientStatus.Kind {
         let key = required.name.normalizedIngredientName
-        guard let owned = result.matchedIngredients.first(where: { $0.ingredientName.normalizedIngredientName == key }) else {
+        guard let owned = ownedLines.first(where: { $0.ingredientName.normalizedIngredientName == key }) else {
             return .missing
         }
         if owned.unit == required.unit, owned.quantity < required.requiredQuantity {

@@ -62,14 +62,16 @@ final class LettuceDecideUITests: XCTestCase {
         )
     }
 
-    /// Problem 1: once recommendations are loaded, changing the pantry and returning to the
-    /// Decide tab must NOT silently refetch. The curry row's match percentage would jump
-    /// from 50% (has chickpeas, missing spinach) to 67% (has both) if it re-ran the matcher.
+    /// A pantry edit re-ranks the *existing* recommendations against the new inventory with
+    /// no refetch. `-uiTestNoRefetch` makes every fetch after the first fail, so if the
+    /// curry card still climbs from 50% (chickpeas) to 67% (chickpeas + spinach), it was
+    /// re-ranked locally rather than reloaded.
     @MainActor
-    func testAddingPantryIngredientDoesNotSilentlyRefetchRecommendations() throws {
-        let app = launchApp()
+    func testAddingPantryIngredientReRanksRecommendationsWithoutRefetching() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-uiTesting", "-uiTestNoRefetch"]
+        app.launch()
 
-        // Load recommendations with just chickpeas.
         XCTAssertTrue(app.buttons["Add Ingredients"].waitForExistence(timeout: 10))
         app.buttons["Add Ingredients"].tap()
         XCTAssertTrue(app.navigationBars["Pantry"].waitForExistence(timeout: 5))
@@ -79,14 +81,15 @@ final class LettuceDecideUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Chickpea and Spinach Curry"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["50% of ingredients in your pantry"].waitForExistence(timeout: 5))
 
-        // Add the missing ingredient, then come back.
+        // Add another ingredient the curry uses.
         app.tabBars.buttons["Pantry"].tap()
         addIngredient(app, name: "spinach")
         app.tabBars.buttons["Decide"].tap()
 
-        // Still the pre-existing 50% result — no background refetch to 67%.
-        XCTAssertTrue(app.staticTexts["50% of ingredients in your pantry"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.staticTexts["67% of ingredients in your pantry"].exists)
+        // The card climbed on its own — and a failed refetch would have shown an error, not this.
+        XCTAssertTrue(app.staticTexts["67% of ingredients in your pantry"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Chickpea and Spinach Curry"].exists)
+        XCTAssertFalse(app.buttons["Try Again"].exists)
     }
 
     @MainActor

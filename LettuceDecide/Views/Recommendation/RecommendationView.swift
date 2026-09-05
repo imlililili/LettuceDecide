@@ -35,7 +35,7 @@ struct RecommendationView: View {
                 List(results) { result in
                     NavigationLink {
                         RecipeDetailView(
-                            viewModel: RecipeDetailViewModel(result: result, pantryStore: pantryStore),
+                            viewModel: RecipeDetailViewModel(recipe: result.recipe, pantryStore: pantryStore),
                             onCooked: {
                                 Task { await viewModel.decide() }
                             }
