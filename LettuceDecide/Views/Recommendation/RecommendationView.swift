@@ -1,90 +1,25 @@
 import SwiftUI
 
-/// The home screen: a ranked list of recipes the cook can make from their pantry right now,
+/// The "Decide" tab: a ranked list of recipes the cook can make from their pantry right now,
 /// most-urgent-to-use and best-matched first.
 struct RecommendationView: View {
-    @StateObject private var viewModel: RecommendationViewModel
-    @StateObject private var settingsViewModel: SettingsViewModel
-    @StateObject private var pantryViewModel: PantryViewModel
-    @StateObject private var weeklyPlannerViewModel: WeeklyPlannerViewModel
-    private let pantryStore: PantryStoring
-    @State private var showingSettings = false
-    @State private var showingPantry = false
-    @State private var showingWeeklyPlanner = false
-
-    init(
-        viewModel: @autoclosure @escaping () -> RecommendationViewModel,
-        settingsViewModel: @autoclosure @escaping () -> SettingsViewModel,
-        pantryViewModel: @autoclosure @escaping () -> PantryViewModel,
-        weeklyPlannerViewModel: @autoclosure @escaping () -> WeeklyPlannerViewModel,
-        pantryStore: PantryStoring
-    ) {
-        _viewModel = StateObject(wrappedValue: viewModel())
-        _settingsViewModel = StateObject(wrappedValue: settingsViewModel())
-        _pantryViewModel = StateObject(wrappedValue: pantryViewModel())
-        _weeklyPlannerViewModel = StateObject(wrappedValue: weeklyPlannerViewModel())
-        self.pantryStore = pantryStore
-    }
+    @ObservedObject var viewModel: RecommendationViewModel
+    let pantryStore: PantryStoring
+    /// Called when the cook has no pantry to recommend from — the shell switches to the
+    /// Pantry tab.
+    let onNeedsPantry: () -> Void
 
     var body: some View {
-        NavigationStack {
-            content
-                .navigationTitle("Recommendations")
-                .toolbar {
-                    ToolbarItem(placement: .topBarLeading) {
-                        Button {
-                            showingPantry = true
-                        } label: {
-                            Image(systemName: "refrigerator")
-                        }
-                        .accessibilityLabel("Pantry")
-                    }
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button {
-                            showingWeeklyPlanner = true
-                        } label: {
-                            Image(systemName: "calendar")
-                        }
-                        .accessibilityLabel("Weekly Planner")
-                    }
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button {
-                            showingSettings = true
-                        } label: {
-                            Image(systemName: "slider.horizontal.3")
-                        }
-                        .accessibilityLabel("Settings")
-                    }
+        content
+            .navigationTitle("Recommendations")
+            .task {
+                // First load only. A loaded list is never silently refetched on reappear —
+                // only "Try Again", cooking a recipe, or pull-to-refresh does that. (The
+                // shell retries a *failed* load when the cook returns to this tab.)
+                if case .idle = viewModel.state {
+                    await viewModel.decide()
                 }
-                .navigationDestination(isPresented: $showingPantry) {
-                    PantryView(viewModel: pantryViewModel)
-                }
-                .navigationDestination(isPresented: $showingWeeklyPlanner) {
-                    WeeklyPlannerView(viewModel: weeklyPlannerViewModel)
-                }
-                .sheet(isPresented: $showingSettings) {
-                    SettingsView(viewModel: settingsViewModel)
-                }
-                .task {
-                    if case .idle = viewModel.state {
-                        await viewModel.decide()
-                    }
-                }
-                .onChange(of: showingPantry) { _, isShowing in
-                    // Returning from the pantry: the inventory may have changed, so refresh.
-                    if !isShowing {
-                        Task { await viewModel.decide() }
-                    }
-                }
-                .onChange(of: showingWeeklyPlanner) { _, isShowing in
-                    // The planner can lead to cooking a recipe, which deducts from the
-                    // pantry — refresh on the way back.
-                    if !isShowing {
-                        pantryViewModel.reload()
-                        Task { await viewModel.decide() }
-                    }
-                }
-        }
+            }
     }
 
     @ViewBuilder
@@ -98,7 +33,6 @@ struct RecommendationView: View {
                     RecipeDetailView(
                         viewModel: RecipeDetailViewModel(result: result, pantryStore: pantryStore),
                         onCooked: {
-                            pantryViewModel.reload()
                             Task { await viewModel.decide() }
                         }
                     )
@@ -117,7 +51,7 @@ struct RecommendationView: View {
                 case .retry:
                     Task { await viewModel.decide() }
                 case .addIngredients:
-                    showingPantry = true
+                    onNeedsPantry()
                 }
             }
         }
@@ -130,25 +64,17 @@ struct RecommendationView: View {
         PantryIngredient(ingredientName: "spinach", quantity: 200, unit: .grams, storageLocation: .fridge),
     ])
     let preferencesStore = InMemoryUserPreferencesStore()
-    RecommendationView(
-        viewModel: RecommendationViewModel(
-            recommendMeals: RecommendMealsFromPantryUseCase(
-                recipeRepository: MockRecipeRepository(),
-                pantryStore: pantryStore,
-                preferencesStore: preferencesStore
-            )
-        ),
-        settingsViewModel: SettingsViewModel(store: preferencesStore),
-        pantryViewModel: PantryViewModel(store: pantryStore),
-        weeklyPlannerViewModel: WeeklyPlannerViewModel(
-            recordBusyness: RecordBusynessUseCase(store: InMemoryScheduleStore()),
-            generatePlan: GenerateWeeklyMealPlanUseCase(
-                recipeRepository: MockRecipeRepository(),
-                pantryStore: pantryStore,
-                preferencesStore: preferencesStore
+    return NavigationStack {
+        RecommendationView(
+            viewModel: RecommendationViewModel(
+                recommendMeals: RecommendMealsFromPantryUseCase(
+                    recipeRepository: MockRecipeRepository(),
+                    pantryStore: pantryStore,
+                    preferencesStore: preferencesStore
+                )
             ),
-            pantryStore: pantryStore
-        ),
-        pantryStore: pantryStore
-    )
+            pantryStore: pantryStore,
+            onNeedsPantry: {}
+        )
+    }
 }

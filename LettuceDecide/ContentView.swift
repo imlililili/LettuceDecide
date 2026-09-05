@@ -8,8 +8,8 @@
 import SwiftUI
 
 /// Composition root: wires the recipe repository (real, or mock when there's no API key or
-/// during UI tests), the persisted pantry and preferences stores, and the recommendation
-/// use case into the view models.
+/// during UI tests) and the persisted stores into the view models, then hands them to the
+/// tab shell.
 struct ContentView: View {
     private let preferencesStore: UserPreferencesStoring
     private let pantryStore: PantryStoring
@@ -36,15 +36,14 @@ struct ContentView: View {
     }
 
     var body: some View {
-        RecommendationView(
-            viewModel: RecommendationViewModel(
+        MainTabView(
+            recommendationViewModel: RecommendationViewModel(
                 recommendMeals: RecommendMealsFromPantryUseCase(
                     recipeRepository: repository,
                     pantryStore: pantryStore,
                     preferencesStore: preferencesStore
                 )
             ),
-            settingsViewModel: SettingsViewModel(store: preferencesStore),
             pantryViewModel: PantryViewModel(store: pantryStore),
             weeklyPlannerViewModel: WeeklyPlannerViewModel(
                 recordBusyness: RecordBusynessUseCase(store: scheduleStore),
@@ -55,6 +54,7 @@ struct ContentView: View {
                 ),
                 pantryStore: pantryStore
             ),
+            settingsViewModel: SettingsViewModel(store: preferencesStore),
             pantryStore: pantryStore
         )
     }
