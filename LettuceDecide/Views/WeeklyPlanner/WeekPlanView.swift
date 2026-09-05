@@ -11,6 +11,13 @@ struct WeekPlanView: View {
 
     var body: some View {
         List {
+            if plan.isFromCache {
+                Section {
+                    StaleResultsNotice()
+                        .listRowInsets(EdgeInsets())
+                }
+            }
+
             Section("Your week") {
                 ForEach(plan.days) { day in
                     if let recipe = day.assignedRecipe {

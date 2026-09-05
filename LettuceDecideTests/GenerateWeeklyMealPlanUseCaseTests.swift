@@ -57,6 +57,24 @@ struct GenerateWeeklyMealPlanUseCaseTests {
 
         #expect(plan.days.count == 7)
         #expect(plan.days.allSatisfy { $0.assignedRecipe != nil })
+        #expect(!plan.isFromCache)
+    }
+
+    @Test func marksThePlanAsFromCache_whenTheCandidatePoolIs() async throws {
+        let cachedCandidates: [PantryRecipeCandidate] = (1...7).map {
+            var c = PantryRecipeCandidate(
+                recipe: Recipe(id: $0, title: "Recipe \($0)", readyInMinutes: 30),
+                usedIngredientNames: ["onion"],
+                missedIngredients: []
+            )
+            c.isFromCache = true
+            return c
+        }
+        let (useCase, _) = makeUseCase(candidates: cachedCandidates)
+
+        let plan = try await useCase.execute(week: week(7), now: monday)
+
+        #expect(plan.isFromCache)
     }
 
     @Test func fails_whenThePantryIsEmpty() async {

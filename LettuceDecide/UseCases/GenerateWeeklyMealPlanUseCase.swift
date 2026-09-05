@@ -55,11 +55,13 @@ struct GenerateWeeklyMealPlanUseCase {
         // RecommendMealsFromPantryUseCase does — the service's filter is a first pass only.
         let safe = candidates.filter { $0.recipe.isSafe(for: preferences.intolerances) }
 
-        return WeeklyPlanBuilder.build(
+        var plan = WeeklyPlanBuilder.build(
             candidates: safe,
             busyness: entries,
             startingFrom: pantry,
             now: now
         )
+        plan.isFromCache = candidates.contains { $0.isFromCache }
+        return plan
     }
 }
