@@ -35,7 +35,10 @@ struct ContentView: View {
             let cache: RecipeCacheStoring = scratchStores ? InMemoryRecipeCacheStore() : RecipeCacheStore()
             repository = CachingRecipeRepository(wrapping: SpoonacularRecipeRepository(), cache: cache)
         } else {
-            repository = MockRecipeRepository()
+            // -uiTestNoRefetch: the first recipe fetch succeeds, any later one fails — so a
+            // UI test can tell "re-ranked locally" (list updates) from "refetched" (error).
+            let failAfterCall = arguments.contains("-uiTestNoRefetch") ? 1 : nil
+            repository = MockRecipeRepository(failAfterCall: failAfterCall)
         }
     }
 

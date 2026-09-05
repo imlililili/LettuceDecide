@@ -4,15 +4,22 @@ import Foundation
 final class MockRecipeRepository: RecipeRepository {
     var candidates: [PantryRecipeCandidate]
     var errorToThrow: Error?
+    /// When set, every call past this many succeeds-then-fails with a network error. Used by
+    /// the UI test that proves a pantry edit re-ranks locally rather than refetching: a
+    /// second fetch would surface the error instead of updating the list in place.
+    var failAfterCall: Int?
     private(set) var lastRequestedPantryNames: [String]?
     private(set) var lastRequestedPreferences: UserPreferences?
+    private var callCount = 0
 
     init(
         candidates: [PantryRecipeCandidate] = MockRecipeRepository.sampleCandidates,
-        errorToThrow: Error? = nil
+        errorToThrow: Error? = nil,
+        failAfterCall: Int? = nil
     ) {
         self.candidates = candidates
         self.errorToThrow = errorToThrow
+        self.failAfterCall = failAfterCall
     }
 
     func findRecipes(
@@ -21,7 +28,11 @@ final class MockRecipeRepository: RecipeRepository {
     ) async throws -> [PantryRecipeCandidate] {
         lastRequestedPantryNames = pantryIngredientNames
         lastRequestedPreferences = preferences
+        callCount += 1
         if let errorToThrow { throw errorToThrow }
+        if let failAfterCall, callCount > failAfterCall {
+            throw RecipeRepositoryError.network(URLError(.notConnectedToInternet))
+        }
         return candidates
     }
 

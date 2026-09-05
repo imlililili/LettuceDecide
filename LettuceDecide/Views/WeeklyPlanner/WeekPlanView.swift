@@ -23,10 +23,7 @@ struct WeekPlanView: View {
                     if let recipe = day.assignedRecipe {
                         NavigationLink {
                             RecipeDetailView(
-                                viewModel: RecipeDetailViewModel(
-                                    result: .matching(recipe, against: pantryStore.load()),
-                                    pantryStore: pantryStore
-                                ),
+                                viewModel: RecipeDetailViewModel(recipe: recipe, pantryStore: pantryStore),
                                 onCooked: {}
                             )
                         } label: {

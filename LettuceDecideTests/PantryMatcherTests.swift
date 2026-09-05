@@ -37,6 +37,49 @@ struct PantryMatcherTests {
         #expect(cachedResult?.isFromCache == true)
     }
 
+    @Test func sameCandidatePoolRanksDifferentlyAgainstDifferentPantries() {
+        let candidate = PantryRecipeCandidate(
+            recipe: recipe(1),
+            usedIngredientNames: ["flour"],
+            missedIngredients: [RecipeIngredient(id: 1, name: "sugar", requiredQuantity: 100, unit: .grams)]
+        )
+        let flourOnly = [
+            PantryIngredient(ingredientName: "flour", quantity: 500, unit: .grams, storageLocation: .pantry)
+        ]
+        let flourAndSugar = flourOnly + [
+            PantryIngredient(ingredientName: "sugar", quantity: 400, unit: .grams, storageLocation: .pantry)
+        ]
+
+        let partial = PantryMatcher().match(candidates: [candidate], against: flourOnly, now: today)
+        let full = PantryMatcher().match(candidates: [candidate], against: flourAndSugar, now: today)
+
+        #expect(partial.first?.matchPercentage == 0.5)
+        #expect(partial.first?.missingIngredients.map(\.name) == ["sugar"])
+        #expect(full.first?.matchPercentage == 1.0)
+        #expect(full.first?.missingIngredients.isEmpty == true)
+    }
+
+    @Test func aMissedIngredientTheCookNowHasCountsAsMatched() {
+        let candidate = PantryRecipeCandidate(
+            recipe: recipe(1),
+            usedIngredientNames: ["eggs"],
+            missedIngredients: [
+                RecipeIngredient(id: 1, name: "flour", requiredQuantity: 200, unit: .grams),
+                RecipeIngredient(id: 2, name: "milk", requiredQuantity: 100, unit: .millilitres),
+            ]
+        )
+        let pantry = [
+            PantryIngredient(ingredientName: "egg", quantity: 6, unit: .pieces, storageLocation: .fridge),
+            PantryIngredient(ingredientName: "Flour", quantity: 1000, unit: .grams, storageLocation: .pantry),
+        ]
+
+        let result = PantryMatcher().match(candidates: [candidate], against: pantry, now: today).first
+
+        #expect(Set(result?.matchedIngredients.map(\.ingredientName) ?? []) == ["egg", "Flour"])
+        #expect(result?.missingIngredients.map(\.name) == ["milk"])
+        #expect(result?.matchPercentage == 2.0 / 3.0)
+    }
+
     @Test func matchPercentageIsMatchedOverMatchedPlusMissing() {
         let pantry = [PantryIngredient(ingredientName: "egg", quantity: 6, unit: .pieces, storageLocation: .fridge)]
         let candidate = PantryRecipeCandidate(

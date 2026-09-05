@@ -22,6 +22,10 @@ enum MealRecommendationError: LocalizedError {
 /// list of recipes they can realistically make, steering them towards ingredients that are
 /// about to expire.
 ///
+/// Deliberately two steps. Fetching the candidate pool is the only part that does I/O and
+/// must not be repeated just because the pantry changed; ranking that pool against the
+/// pantry is pure and local, so it can re-run every time the inventory moves.
+///
 /// Protects two rules:
 /// - **Safety (zero tolerance):** every candidate is re-checked client-side against the
 ///   cook's declared restrictions before it is shown. The recipe service's own filtering is
@@ -35,7 +39,9 @@ struct RecommendMealsFromPantryUseCase {
     let preferencesStore: UserPreferencesStoring
     var matcher = PantryMatcher()
 
-    func execute(now: Date = Date()) async throws -> [PantryMatchResult] {
+    /// The I/O step: fetch the candidate pool and drop anything unsafe for the cook's
+    /// declared restrictions. The result is **not** yet ranked against the pantry.
+    func fetchSafeCandidates() async throws -> [PantryRecipeCandidate] {
         let pantry = pantryStore.load()
         guard !pantry.isEmpty else {
             throw MealRecommendationError.noPantryIngredientsRecorded
@@ -57,7 +63,18 @@ struct RecommendMealsFromPantryUseCase {
         guard !safe.isEmpty else {
             throw MealRecommendationError.noSafeRecipesAvailable
         }
+        return safe
+    }
 
-        return matcher.match(candidates: safe, against: pantry, now: now)
+    /// The pure step: rank an already-fetched pool against the **current** pantry. No
+    /// network, no dependency on when the pool was fetched — safe to call on every pantry
+    /// change.
+    func rank(_ candidates: [PantryRecipeCandidate], now: Date = Date()) -> [PantryMatchResult] {
+        matcher.match(candidates: candidates, against: pantryStore.load(), now: now)
+    }
+
+    /// Fetch then rank — the original one-shot operation.
+    func execute(now: Date = Date()) async throws -> [PantryMatchResult] {
+        rank(try await fetchSafeCandidates(), now: now)
     }
 }
