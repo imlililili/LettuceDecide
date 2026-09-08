@@ -8,6 +8,18 @@ struct RecipeDetailViewModelTests {
         Recipe(id: 1, title: "Test Dish", requiredIngredients: required)
     }
 
+    private func makeViewModel(
+        _ recipe: Recipe,
+        pantryStore: InMemoryPantryStore,
+        shoppingListStore: InMemoryShoppingListStore = InMemoryShoppingListStore()
+    ) -> RecipeDetailViewModel {
+        RecipeDetailViewModel(
+            recipe: recipe,
+            pantryStore: pantryStore,
+            addToShoppingList: AddMissingIngredientsToShoppingListUseCase(store: shoppingListStore)
+        )
+    }
+
     @Test func ingredientStatusesClassifyHaveShortAndMissingFromCurrentPantry() {
         let cooked = recipe([
             RecipeIngredient(id: 1, name: "flour", requiredQuantity: 200, unit: .grams),
@@ -18,7 +30,7 @@ struct RecipeDetailViewModelTests {
             PantryIngredient(ingredientName: "flour", quantity: 500, unit: .grams, storageLocation: .pantry),
             PantryIngredient(ingredientName: "sugar", quantity: 40, unit: .grams, storageLocation: .pantry),
         ])
-        let viewModel = RecipeDetailViewModel(recipe: cooked, pantryStore: store)
+        let viewModel = makeViewModel(cooked, pantryStore: store)
 
         let statuses = viewModel.ingredientStatuses
         #expect(statuses.map(\.kind) == [.have, .shortBy(have: 40, unit: .grams), .missing])
@@ -34,7 +46,7 @@ struct RecipeDetailViewModelTests {
         let store = InMemoryPantryStore(initial: [
             PantryIngredient(ingredientName: "flour", quantity: 500, unit: .grams, storageLocation: .pantry)
         ])
-        let viewModel = RecipeDetailViewModel(recipe: cooked, pantryStore: store)
+        let viewModel = makeViewModel(cooked, pantryStore: store)
         #expect(viewModel.ingredientStatuses.map(\.kind) == [.have, .missing])
 
         // The cook adds the missing ingredient elsewhere; the checklist catches up with no
@@ -50,14 +62,14 @@ struct RecipeDetailViewModelTests {
         let store = InMemoryPantryStore(initial: [
             PantryIngredient(ingredientName: "flour", quantity: 500, unit: .grams, storageLocation: .pantry)
         ])
-        let viewModel = RecipeDetailViewModel(
-            recipe: recipe([RecipeIngredient(id: 1, name: "flour", requiredQuantity: 200, unit: .grams)]),
+        let viewModel = makeViewModel(
+            recipe([RecipeIngredient(id: 1, name: "flour", requiredQuantity: 200, unit: .grams)]),
             pantryStore: store
         )
 
         viewModel.markAsCooked()
 
-        #expect(viewModel.cookAlert?.didCook == true)
+        #expect(viewModel.notice?.dismissPops == true)
         #expect(store.load().first?.quantity == 300)
     }
 
@@ -65,14 +77,34 @@ struct RecipeDetailViewModelTests {
         let store = InMemoryPantryStore(initial: [
             PantryIngredient(ingredientName: "flour", quantity: 100, unit: .grams, storageLocation: .pantry)
         ])
-        let viewModel = RecipeDetailViewModel(
-            recipe: recipe([RecipeIngredient(id: 1, name: "flour", requiredQuantity: 250, unit: .grams)]),
+        let viewModel = makeViewModel(
+            recipe([RecipeIngredient(id: 1, name: "flour", requiredQuantity: 250, unit: .grams)]),
             pantryStore: store
         )
 
         viewModel.markAsCooked()
 
-        #expect(viewModel.cookAlert?.didCook == false)
+        #expect(viewModel.notice?.dismissPops == false)
         #expect(store.load().first?.quantity == 100)
+    }
+
+    @Test func addMissingToShoppingListSendsOnlyTheStillMissingIngredients() {
+        let cooked = recipe([
+            RecipeIngredient(id: 1, name: "flour", requiredQuantity: 200, unit: .grams),
+            RecipeIngredient(id: 2, name: "sugar", requiredQuantity: 100, unit: .grams),
+        ])
+        let shoppingListStore = InMemoryShoppingListStore()
+        let viewModel = makeViewModel(
+            cooked,
+            pantryStore: InMemoryPantryStore(initial: [
+                PantryIngredient(ingredientName: "flour", quantity: 500, unit: .grams, storageLocation: .pantry)
+            ]),
+            shoppingListStore: shoppingListStore
+        )
+
+        viewModel.addMissingToShoppingList()
+
+        #expect(shoppingListStore.loadItems().map(\.ingredientName) == ["sugar"])
+        #expect(viewModel.notice?.dismissPops == false)
     }
 }

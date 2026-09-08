@@ -45,7 +45,7 @@ enum WeeklyPlanBuilder {
             days.append(DayMealPlan(id: entry.date, busyness: entry.busyness, assignedRecipe: pick.recipe))
 
             for shortfall in consume(pick.recipe, from: &virtualPantry, now: now) {
-                merge(shortfall, into: &shoppingList)
+                shoppingList.addMerging(shortfall)
             }
         }
 
@@ -114,15 +114,5 @@ enum WeeklyPlanBuilder {
             unit: required.unit,
             dateAdded: now
         )
-    }
-
-    /// Merges `item` into `list` on `ShoppingListItem.mergeKey` (normalised name + unit),
-    /// summing quantities. Different units for the same name stay as separate lines.
-    private static func merge(_ item: ShoppingListItem, into list: inout [ShoppingListItem]) {
-        if let index = list.firstIndex(where: { $0.mergeKey == item.mergeKey }) {
-            list[index].requiredQuantity += item.requiredQuantity
-        } else {
-            list.append(item)
-        }
     }
 }

@@ -14,6 +14,7 @@ struct ContentView: View {
     private let preferencesStore: UserPreferencesStoring
     private let pantryStore: PantryStoring
     private let scheduleStore: ScheduleStoring
+    private let shoppingListStore: ShoppingListStoring
     private let repository: RecipeRepository
 
     init() {
@@ -27,6 +28,7 @@ struct ContentView: View {
         preferencesStore = scratchStores ? InMemoryUserPreferencesStore() : UserPreferencesStore()
         pantryStore = scratchStores ? InMemoryPantryStore() : PantryStore()
         scheduleStore = scratchStores ? InMemoryScheduleStore() : ScheduleStore()
+        shoppingListStore = scratchStores ? InMemoryShoppingListStore() : ShoppingListStore()
 
         if !uiTesting, Config.spoonacularAPIKey != nil {
             // The real API sits behind a cache so an unreachable network falls back to the
@@ -62,7 +64,8 @@ struct ContentView: View {
                 pantryStore: pantryStore
             ),
             settingsViewModel: SettingsViewModel(store: preferencesStore),
-            pantryStore: pantryStore
+            pantryStore: pantryStore,
+            addToShoppingList: AddMissingIngredientsToShoppingListUseCase(store: shoppingListStore)
         )
     }
 }

@@ -15,6 +15,7 @@ struct MainTabView: View {
     @StateObject private var weeklyPlannerViewModel: WeeklyPlannerViewModel
     @StateObject private var settingsViewModel: SettingsViewModel
     private let pantryStore: PantryStoring
+    private let addToShoppingList: AddMissingIngredientsToShoppingListUseCase
 
     @State private var selectedTab: Tab = .decide
 
@@ -23,13 +24,15 @@ struct MainTabView: View {
         pantryViewModel: @autoclosure @escaping () -> PantryViewModel,
         weeklyPlannerViewModel: @autoclosure @escaping () -> WeeklyPlannerViewModel,
         settingsViewModel: @autoclosure @escaping () -> SettingsViewModel,
-        pantryStore: PantryStoring
+        pantryStore: PantryStoring,
+        addToShoppingList: AddMissingIngredientsToShoppingListUseCase
     ) {
         _recommendationViewModel = StateObject(wrappedValue: recommendationViewModel())
         _pantryViewModel = StateObject(wrappedValue: pantryViewModel())
         _weeklyPlannerViewModel = StateObject(wrappedValue: weeklyPlannerViewModel())
         _settingsViewModel = StateObject(wrappedValue: settingsViewModel())
         self.pantryStore = pantryStore
+        self.addToShoppingList = addToShoppingList
     }
 
     var body: some View {
@@ -38,6 +41,7 @@ struct MainTabView: View {
                 RecommendationView(
                     viewModel: recommendationViewModel,
                     pantryStore: pantryStore,
+                    addToShoppingList: addToShoppingList,
                     onNeedsPantry: { selectedTab = .pantry }
                 )
             }
@@ -51,7 +55,10 @@ struct MainTabView: View {
             .tag(Tab.pantry)
 
             NavigationStack {
-                WeeklyPlannerView(viewModel: weeklyPlannerViewModel)
+                WeeklyPlannerView(
+                    viewModel: weeklyPlannerViewModel,
+                    addToShoppingList: addToShoppingList
+                )
             }
             .tabItem { Label("Calendar", systemImage: "calendar") }
             .tag(Tab.calendar)
@@ -105,6 +112,7 @@ struct MainTabView: View {
             pantryStore: pantryStore
         ),
         settingsViewModel: SettingsViewModel(store: preferencesStore),
-        pantryStore: pantryStore
+        pantryStore: pantryStore,
+        addToShoppingList: AddMissingIngredientsToShoppingListUseCase(store: InMemoryShoppingListStore())
     )
 }

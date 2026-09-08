@@ -28,36 +28,48 @@ struct RecipeDetailView: View {
         }
         .navigationTitle(recipe.title)
         .navigationBarTitleDisplayMode(.inline)
-        .safeAreaInset(edge: .bottom) {
-            Button {
-                viewModel.markAsCooked()
-            } label: {
-                Text("Mark as Cooked")
-                    .font(.headline)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 6)
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    viewModel.addMissingToShoppingList()
+                } label: {
+                    Label("Add missing to shopping list", systemImage: "cart.badge.plus")
+                }
+                .disabled(viewModel.missingIngredients.isEmpty)
             }
-            .buttonStyle(.borderedProminent)
-            .padding()
-            .background(.bar)
         }
+        .safeAreaInset(edge: .bottom) { cookBar }
         .alert(
-            viewModel.cookAlert?.title ?? "",
+            viewModel.notice?.title ?? "",
             isPresented: Binding(
-                get: { viewModel.cookAlert != nil },
-                set: { if !$0 { viewModel.cookAlert = nil } }
+                get: { viewModel.notice != nil },
+                set: { if !$0 { viewModel.notice = nil } }
             ),
-            presenting: viewModel.cookAlert
-        ) { alert in
+            presenting: viewModel.notice
+        ) { notice in
             Button("OK") {
-                if alert.didCook {
+                if notice.dismissPops {
                     onCooked()
                     dismiss()
                 }
             }
-        } message: { alert in
-            Text(alert.message)
+        } message: { notice in
+            Text(notice.message)
         }
+    }
+
+    private var cookBar: some View {
+        Button {
+            viewModel.markAsCooked()
+        } label: {
+            Text("Mark as Cooked")
+                .font(.headline)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 6)
+        }
+        .buttonStyle(.borderedProminent)
+        .padding()
+        .background(.bar)
     }
 
     private var header: some View {
@@ -219,7 +231,8 @@ private struct IngredientStatusRow: View {
                 pantryStore: InMemoryPantryStore(initial: [
                     PantryIngredient(ingredientName: "chickpeas", quantity: 200, unit: .grams, storageLocation: .pantry),
                     PantryIngredient(ingredientName: "spinach", quantity: 200, unit: .grams, storageLocation: .fridge),
-                ])
+                ]),
+                addToShoppingList: AddMissingIngredientsToShoppingListUseCase(store: InMemoryShoppingListStore())
             ),
             onCooked: {}
         )
