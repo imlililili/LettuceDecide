@@ -5,6 +5,7 @@ import SwiftUI
 struct RecommendationView: View {
     @ObservedObject var viewModel: RecommendationViewModel
     let pantryStore: PantryStoring
+    let addToShoppingList: AddMissingIngredientsToShoppingListUseCase
     /// Called when the cook has no pantry to recommend from — the shell switches to the
     /// Pantry tab.
     let onNeedsPantry: () -> Void
@@ -35,7 +36,11 @@ struct RecommendationView: View {
                 List(results) { result in
                     NavigationLink {
                         RecipeDetailView(
-                            viewModel: RecipeDetailViewModel(recipe: result.recipe, pantryStore: pantryStore),
+                            viewModel: RecipeDetailViewModel(
+                                recipe: result.recipe,
+                                pantryStore: pantryStore,
+                                addToShoppingList: addToShoppingList
+                            ),
                             onCooked: {
                                 Task { await viewModel.decide() }
                             }
@@ -79,6 +84,7 @@ struct RecommendationView: View {
                 )
             ),
             pantryStore: pantryStore,
+            addToShoppingList: AddMissingIngredientsToShoppingListUseCase(store: InMemoryShoppingListStore()),
             onNeedsPantry: {}
         )
     }

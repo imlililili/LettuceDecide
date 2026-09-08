@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// Add / Edit Ingredient sheet. Its fields map onto `AddPantryIngredientUseCase`; on save it
+/// Add / Edit Ingredient sheet. Its fields map onto a `ManagePantryIngredientUseCase.Action`; on save it
 /// calls back into the caller, and surfaces any `PantryIngredientError` in the form using the
 /// domain's own wording rather than a raw system error.
 struct AddEditIngredientView: View {

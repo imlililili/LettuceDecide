@@ -2,6 +2,9 @@ import Foundation
 import Testing
 @testable import LettuceDecide
 
+/// The pantry inventory rules live in `ManagePantryIngredientUseCaseTests`. This covers only
+/// what the view model adds: reloading its published list after a change, grouping for the
+/// screen, and surfacing the use case's errors.
 @MainActor
 struct PantryViewModelTests {
     private func draft(
@@ -18,17 +21,24 @@ struct PantryViewModelTests {
         return d
     }
 
-    @Test func addRecordsAndReloadsTheIngredient() throws {
+    @Test func reloadsThePublishedListAfterAddUpdateAndDelete() throws {
         let store = InMemoryPantryStore()
         let viewModel = PantryViewModel(store: store)
 
         try viewModel.add(draft(name: "Spinach"))
-
         #expect(viewModel.ingredients.map(\.ingredientName) == ["Spinach"])
-        #expect(store.load().count == 1)
+
+        let line = try #require(viewModel.ingredients.first)
+        var edited = IngredientDraft(from: line)
+        edited.quantity = 50
+        try viewModel.update(line, with: edited)
+        #expect(viewModel.ingredients.first?.quantity == 50)
+
+        viewModel.delete(line)
+        #expect(viewModel.ingredients.isEmpty)
     }
 
-    @Test func addSurfacesDomainValidationErrors() {
+    @Test func surfacesTheUseCasesValidationError() {
         let viewModel = PantryViewModel(store: InMemoryPantryStore())
 
         #expect(throws: PantryIngredientError.invalidQuantity(provided: 0)) {
@@ -43,38 +53,5 @@ struct PantryViewModelTests {
         try viewModel.add(draft(name: "Milk", location: .fridge))
 
         #expect(viewModel.sections.map(\.location) == [.fridge, .freezer, .pantry])
-    }
-
-    @Test func addMergesDuplicatePantryLines() throws {
-        let viewModel = PantryViewModel(store: InMemoryPantryStore())
-        try viewModel.add(draft(name: "eggs", quantity: 6, unit: .pieces))
-        try viewModel.add(draft(name: "Egg", quantity: 4, unit: .pieces))
-
-        #expect(viewModel.ingredients.count == 1)
-        #expect(viewModel.ingredients.first?.quantity == 10)
-    }
-
-    @Test func updateChangesQuantityInPlace() throws {
-        let store = InMemoryPantryStore()
-        let viewModel = PantryViewModel(store: store)
-        try viewModel.add(draft(name: "Butter", quantity: 250))
-        let existing = try #require(viewModel.ingredients.first)
-
-        var edited = IngredientDraft(from: existing)
-        edited.quantity = 100
-        try viewModel.update(existing, with: edited)
-
-        #expect(viewModel.ingredients.first?.quantity == 100)
-        #expect(store.load().first?.quantity == 100)
-    }
-
-    @Test func deleteRemovesTheLine() throws {
-        let viewModel = PantryViewModel(store: InMemoryPantryStore())
-        try viewModel.add(draft(name: "Bread"))
-        let existing = try #require(viewModel.ingredients.first)
-
-        viewModel.delete(existing)
-
-        #expect(viewModel.ingredients.isEmpty)
     }
 }

@@ -8,6 +8,9 @@ import SwiftUI
 struct WeekPlanView: View {
     let plan: WeeklyMealPlan
     let pantryStore: PantryStoring
+    let addToShoppingList: AddMissingIngredientsToShoppingListUseCase
+
+    @State private var addedCount: Int?
 
     var body: some View {
         List {
@@ -23,7 +26,11 @@ struct WeekPlanView: View {
                     if let recipe = day.assignedRecipe {
                         NavigationLink {
                             RecipeDetailView(
-                                viewModel: RecipeDetailViewModel(recipe: recipe, pantryStore: pantryStore),
+                                viewModel: RecipeDetailViewModel(
+                                    recipe: recipe,
+                                    pantryStore: pantryStore,
+                                    addToShoppingList: addToShoppingList
+                                ),
                                 onCooked: {}
                             )
                         } label: {
@@ -45,6 +52,12 @@ struct WeekPlanView: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
+                    Button {
+                        let list = addToShoppingList.execute(adding: plan.shoppingList)
+                        addedCount = list.count
+                    } label: {
+                        Label("Add all to my shopping list", systemImage: "cart.badge.plus")
+                    }
                 }
             } else if plan.days.contains(where: { $0.assignedRecipe != nil }) {
                 Section("Shopping list") {
@@ -56,6 +69,14 @@ struct WeekPlanView: View {
         }
         .navigationTitle("This Week's Plan")
         .navigationBarTitleDisplayMode(.inline)
+        .alert(
+            "Added to your shopping list",
+            isPresented: Binding(get: { addedCount != nil }, set: { if !$0 { addedCount = nil } })
+        ) {
+            Button("OK") { addedCount = nil }
+        } message: {
+            Text("Your shopping list now has \(addedCount ?? 0) item\((addedCount ?? 0) == 1 ? "" : "s").")
+        }
     }
 
     static func number(_ value: Double) -> String {
@@ -113,6 +134,10 @@ private struct DayRow: View {
         ]
     )
     return NavigationStack {
-        WeekPlanView(plan: plan, pantryStore: InMemoryPantryStore())
+        WeekPlanView(
+            plan: plan,
+            pantryStore: InMemoryPantryStore(),
+            addToShoppingList: AddMissingIngredientsToShoppingListUseCase(store: InMemoryShoppingListStore())
+        )
     }
 }

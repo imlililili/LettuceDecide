@@ -7,7 +7,7 @@ import Foundation
 ///
 /// Business rules:
 /// - `quantity` is always greater than zero. A line with zero or negative quantity is not
-///   inventory, it is a data error, and `AddPantryIngredientUseCase` rejects it.
+///   inventory, it is a data error, and `ManagePantryIngredientUseCase` rejects it.
 /// - Two lines that share the same normalised name, unit, and storage location describe the
 ///   same physical stock and must be merged into one line (their quantities added), never
 ///   stored side by side. `mergeKey` is that identity.

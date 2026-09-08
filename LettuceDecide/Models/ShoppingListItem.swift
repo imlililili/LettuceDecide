@@ -44,3 +44,19 @@ struct ShoppingListItem: Identifiable, Codable, Equatable {
         let unit: IngredientUnit
     }
 }
+
+extension Array where Element == ShoppingListItem {
+    /// Adds `item` under the dedupe rule: an existing line with the same `mergeKey`
+    /// (normalised name + unit) has its quantity summed; anything else is appended. Different
+    /// units for the same name stay as separate lines.
+    ///
+    /// Shared by `WeeklyPlanBuilder` (aggregating a week's shortfalls) and
+    /// `AddMissingIngredientsToShoppingListUseCase` (merging into the saved list).
+    mutating func addMerging(_ item: ShoppingListItem) {
+        if let index = firstIndex(where: { $0.mergeKey == item.mergeKey }) {
+            self[index].requiredQuantity += item.requiredQuantity
+        } else {
+            append(item)
+        }
+    }
+}

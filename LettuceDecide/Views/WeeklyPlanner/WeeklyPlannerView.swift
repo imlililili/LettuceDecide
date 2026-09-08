@@ -4,6 +4,7 @@ import SwiftUI
 /// then generate a plan against the current pantry.
 struct WeeklyPlannerView: View {
     @ObservedObject var viewModel: WeeklyPlannerViewModel
+    let addToShoppingList: AddMissingIngredientsToShoppingListUseCase
 
     var body: some View {
         Form {
@@ -40,7 +41,11 @@ struct WeeklyPlannerView: View {
         }
         .navigationDestination(isPresented: planReadyBinding) {
             if case .generated(let plan) = viewModel.state {
-                WeekPlanView(plan: plan, pantryStore: viewModel.pantryStore)
+                WeekPlanView(
+                    plan: plan,
+                    pantryStore: viewModel.pantryStore,
+                    addToShoppingList: addToShoppingList
+                )
             }
         }
         .alert(
@@ -103,14 +108,17 @@ private struct DayBusynessRow: View {
     ])
     let preferencesStore = InMemoryUserPreferencesStore()
     return NavigationStack {
-        WeeklyPlannerView(viewModel: WeeklyPlannerViewModel(
-            recordBusyness: RecordBusynessUseCase(store: InMemoryScheduleStore()),
-            generatePlan: GenerateWeeklyMealPlanUseCase(
-                recipeRepository: MockRecipeRepository(),
-                pantryStore: pantryStore,
-                preferencesStore: preferencesStore
+        WeeklyPlannerView(
+            viewModel: WeeklyPlannerViewModel(
+                recordBusyness: RecordBusynessUseCase(store: InMemoryScheduleStore()),
+                generatePlan: GenerateWeeklyMealPlanUseCase(
+                    recipeRepository: MockRecipeRepository(),
+                    pantryStore: pantryStore,
+                    preferencesStore: preferencesStore
+                ),
+                pantryStore: pantryStore
             ),
-            pantryStore: pantryStore
-        ))
+            addToShoppingList: AddMissingIngredientsToShoppingListUseCase(store: InMemoryShoppingListStore())
+        )
     }
 }

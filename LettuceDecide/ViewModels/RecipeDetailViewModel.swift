@@ -27,6 +27,7 @@ final class RecipeDetailViewModel: ObservableObject {
 
     private let pantryStore: PantryStoring
     private let updateInventory: UpdateInventoryAfterCookingUseCase
+    private let addToShoppingList: AddMissingIngredientsToShoppingListUseCase
     private var pantryChangeCancellable: AnyCancellable?
 
     /// The pantry as it stands now. Refreshed whenever the store announces a change, so the
@@ -34,20 +35,25 @@ final class RecipeDetailViewModel: ObservableObject {
     /// on the Pantry tab and comes back, the ticks are already right.
     @Published private var pantry: [PantryIngredient]
 
-    @Published var cookAlert: CookAlert?
+    @Published var notice: Notice?
 
-    struct CookAlert: Identifiable {
+    struct Notice: Identifiable {
         let id = UUID()
         let title: String
         let message: String
-        /// Whether the pantry was actually updated (drives "pop back on OK").
-        let didCook: Bool
+        /// Whether tapping OK should pop the screen (true only after a successful cook).
+        let dismissPops: Bool
     }
 
-    init(recipe: Recipe, pantryStore: PantryStoring) {
+    init(
+        recipe: Recipe,
+        pantryStore: PantryStoring,
+        addToShoppingList: AddMissingIngredientsToShoppingListUseCase
+    ) {
         self.recipe = recipe
         self.pantryStore = pantryStore
         self.updateInventory = UpdateInventoryAfterCookingUseCase(store: pantryStore)
+        self.addToShoppingList = addToShoppingList
         self.pantry = pantryStore.load()
         pantryChangeCancellable = pantryStore.changes
             .sink { [weak self] in
@@ -76,19 +82,37 @@ final class RecipeDetailViewModel: ObservableObject {
         }
     }
 
+    /// The recipe ingredients the pantry doesn't currently cover — what an "add to shopping
+    /// list" action would add.
+    var missingIngredients: [RecipeIngredient] {
+        currentMatch.missingIngredients
+    }
+
     func markAsCooked() {
         do {
             let outcome = try updateInventory.execute(currentMatch)
-            cookAlert = CookAlert(title: "Marked as cooked", message: message(for: outcome), didCook: true)
+            notice = Notice(title: "Marked as cooked", message: message(for: outcome), dismissPops: true)
         } catch let error as InventoryUpdateError {
-            cookAlert = CookAlert(
+            notice = Notice(
                 title: "Couldn't update your pantry",
                 message: error.errorDescription ?? "Something went wrong.",
-                didCook: false
+                dismissPops: false
             )
         } catch {
-            cookAlert = CookAlert(title: "Couldn't update your pantry", message: error.localizedDescription, didCook: false)
+            notice = Notice(title: "Couldn't update your pantry", message: error.localizedDescription, dismissPops: false)
         }
+    }
+
+    func addMissingToShoppingList() {
+        let missing = missingIngredients
+        guard !missing.isEmpty else { return }
+        addToShoppingList.execute(missing: missing)
+        let names = missing.map(\.name)
+        notice = Notice(
+            title: "Added to your shopping list",
+            message: "\(list(names)) — \(missing.count == 1 ? "1 item" : "\(missing.count) items").",
+            dismissPops: false
+        )
     }
 
     private func kind(for required: RecipeIngredient, ownedLines: [PantryIngredient]) -> IngredientStatus.Kind {

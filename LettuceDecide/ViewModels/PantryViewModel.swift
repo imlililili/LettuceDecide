@@ -1,8 +1,8 @@
 import Foundation
 import Combine
 
-/// The editable form state behind the Add / Edit Ingredient sheet. Maps one-to-one onto
-/// `AddPantryIngredientUseCase`'s inputs.
+/// The editable form state behind the Add / Edit Ingredient sheet. Maps onto a
+/// `ManagePantryIngredientUseCase.Action`.
 struct IngredientDraft: Equatable {
     var name: String = ""
     var quantity: Double = 1
@@ -37,11 +37,11 @@ final class PantryViewModel: ObservableObject {
     @Published private(set) var ingredients: [PantryIngredient] = []
 
     private let store: PantryStoring
-    private let addIngredient: AddPantryIngredientUseCase
+    private let managePantry: ManagePantryIngredientUseCase
 
     init(store: PantryStoring) {
         self.store = store
-        self.addIngredient = AddPantryIngredientUseCase(store: store)
+        self.managePantry = ManagePantryIngredientUseCase(store: store)
         reload()
     }
 
@@ -61,39 +61,34 @@ final class PantryViewModel: ObservableObject {
         ingredients = store.load()
     }
 
-    /// Records a new ingredient via `AddPantryIngredientUseCase` (which merges duplicates and
-    /// rejects invalid quantities / past expiry dates).
+    /// Records a new ingredient (the use case merges duplicates and rejects invalid
+    /// quantities / past expiry dates).
     func add(_ draft: IngredientDraft) throws {
-        try addIngredient.execute(
+        try managePantry.execute(.add(
             name: draft.name,
             quantity: draft.quantity,
             unit: draft.unit,
             storageLocation: draft.storageLocation,
             expiryDate: draft.expiryDateOrNil
-        )
+        ))
         reload()
     }
 
     /// Edits an existing line in place. The ingredient's name is fixed once recorded — to
     /// change it, delete the line and add a new one.
     func update(_ ingredient: PantryIngredient, with draft: IngredientDraft) throws {
-        guard draft.quantity > 0 else {
-            throw PantryIngredientError.invalidQuantity(provided: draft.quantity)
-        }
-        var pantry = store.load()
-        guard let index = pantry.firstIndex(where: { $0.id == ingredient.id }) else { return }
-        pantry[index].quantity = draft.quantity
-        pantry[index].unit = draft.unit
-        pantry[index].storageLocation = draft.storageLocation
-        pantry[index].expiryDate = draft.expiryDateOrNil
-        store.save(pantry)
+        try managePantry.execute(.update(
+            id: ingredient.id,
+            quantity: draft.quantity,
+            unit: draft.unit,
+            storageLocation: draft.storageLocation,
+            expiryDate: draft.expiryDateOrNil
+        ))
         reload()
     }
 
     func delete(_ ingredient: PantryIngredient) {
-        var pantry = store.load()
-        pantry.removeAll { $0.id == ingredient.id }
-        store.save(pantry)
+        try? managePantry.execute(.remove(id: ingredient.id))
         reload()
     }
 

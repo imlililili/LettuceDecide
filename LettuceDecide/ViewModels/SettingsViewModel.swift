@@ -4,13 +4,18 @@ import Combine
 @MainActor
 final class SettingsViewModel: ObservableObject {
     @Published var preferences: UserPreferences {
-        didSet { store.save(preferences) }
+        didSet {
+            // Only the diet picker and the allergen toggles can reach here, and neither can
+            // produce an invalid value — but the write still goes through the use case so
+            // allergen data follows the same path as every other domain mutation.
+            _ = try? updatePreferences.execute(preferences)
+        }
     }
 
-    private let store: UserPreferencesStoring
+    private let updatePreferences: UpdateUserPreferencesUseCase
 
     init(store: UserPreferencesStoring) {
-        self.store = store
+        self.updatePreferences = UpdateUserPreferencesUseCase(store: store)
         self.preferences = store.load()
     }
 
