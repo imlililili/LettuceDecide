@@ -18,19 +18,24 @@ enum Config {
     }
 
     static var spoonacularAPIKey: String? {
-        if let envKey = ProcessInfo.processInfo.environment["SPOONACULAR_API_KEY"], !envKey.isEmpty {
-            return envKey
+        // Trimmed defensively: a stray trailing newline from copying the key out of a
+        // terminal or the Spoonacular dashboard is an easy, silent mistake — an API key sent
+        // with one embedded turns into an unauthorized request that the network layer reports
+        // as a generic failure, not "your key has a newline in it".
+        if let envKey = ProcessInfo.processInfo.environment["SPOONACULAR_API_KEY"] {
+            let trimmed = envKey.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.isEmpty { return trimmed }
         }
         guard
             let url = Bundle.main.url(forResource: "Config", withExtension: "plist"),
             let data = try? Data(contentsOf: url),
             let plist = try? PropertyListSerialization.propertyList(from: data, format: nil) as? [String: Any],
-            let key = plist["SpoonacularAPIKey"] as? String,
-            !key.isEmpty,
-            key != "YOUR_API_KEY_HERE"
+            let rawKey = plist["SpoonacularAPIKey"] as? String
         else {
             return nil
         }
+        let key = rawKey.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !key.isEmpty, key != "YOUR_API_KEY_HERE" else { return nil }
         return key
     }
 
