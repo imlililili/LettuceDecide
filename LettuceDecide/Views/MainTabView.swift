@@ -4,13 +4,13 @@ import SwiftUI
 /// switching tabs never disturbs another tab's navigation.
 struct MainTabView: View {
     enum Tab: Hashable {
-        case decide
+        case home
         case pantry
         case calendar
         case settings
     }
 
-    @StateObject private var recommendationViewModel: RecommendationViewModel
+    @StateObject private var homeViewModel: HomeViewModel
     @StateObject private var pantryViewModel: PantryViewModel
     @StateObject private var weeklyPlannerViewModel: WeeklyPlannerViewModel
     @StateObject private var settingsViewModel: SettingsViewModel
@@ -18,10 +18,10 @@ struct MainTabView: View {
     private let addToShoppingList: AddMissingIngredientsToShoppingListUseCase
     private let confirmedMealStore: ConfirmedMealStoring
 
-    @State private var selectedTab: Tab = .decide
+    @State private var selectedTab: Tab = .home
 
     init(
-        recommendationViewModel: @autoclosure @escaping () -> RecommendationViewModel,
+        homeViewModel: @autoclosure @escaping () -> HomeViewModel,
         pantryViewModel: @autoclosure @escaping () -> PantryViewModel,
         weeklyPlannerViewModel: @autoclosure @escaping () -> WeeklyPlannerViewModel,
         settingsViewModel: @autoclosure @escaping () -> SettingsViewModel,
@@ -29,7 +29,7 @@ struct MainTabView: View {
         addToShoppingList: AddMissingIngredientsToShoppingListUseCase,
         confirmedMealStore: ConfirmedMealStoring
     ) {
-        _recommendationViewModel = StateObject(wrappedValue: recommendationViewModel())
+        _homeViewModel = StateObject(wrappedValue: homeViewModel())
         _pantryViewModel = StateObject(wrappedValue: pantryViewModel())
         _weeklyPlannerViewModel = StateObject(wrappedValue: weeklyPlannerViewModel())
         _settingsViewModel = StateObject(wrappedValue: settingsViewModel())
@@ -41,16 +41,16 @@ struct MainTabView: View {
     var body: some View {
         TabView(selection: $selectedTab) {
             NavigationStack {
-                RecommendationView(
-                    viewModel: recommendationViewModel,
+                HomeView(
+                    viewModel: homeViewModel,
                     pantryStore: pantryStore,
                     addToShoppingList: addToShoppingList,
                     confirmedMealStore: confirmedMealStore,
-                    onNeedsPantry: { selectedTab = .pantry }
+                    onNeedsPlanning: { selectedTab = .calendar }
                 )
             }
-            .tabItem { Label("Decide", systemImage: "fork.knife") }
-            .tag(Tab.decide)
+            .tabItem { Label("Home", systemImage: "house.fill") }
+            .tag(Tab.home)
 
             NavigationStack {
                 PantryView(viewModel: pantryViewModel)
@@ -76,12 +76,10 @@ struct MainTabView: View {
         }
         .onChange(of: selectedTab) { _, tab in
             switch tab {
-            case .decide:
-                // Retry a failed load — the cook may have just added the pantry ingredient
-                // that was missing. A loaded list is left alone (no silent refetch).
-                if case .failed = recommendationViewModel.state {
-                    Task { await recommendationViewModel.decide() }
-                }
+            case .home:
+                // A day confirmed on another tab, or a meal marked cooked from within Home's
+                // own stack, may have changed what belongs here.
+                homeViewModel.reload()
             case .pantry:
                 // A cooked recipe or a generated plan on another tab may have moved stock.
                 pantryViewModel.reload()
@@ -98,14 +96,10 @@ struct MainTabView: View {
         PantryIngredient(ingredientName: "spinach", quantity: 200, unit: .grams, storageLocation: .fridge),
     ])
     let preferencesStore = InMemoryUserPreferencesStore()
+    let confirmedMealStore = InMemoryConfirmedMealStore()
+    let shoppingListStore = InMemoryShoppingListStore()
     return MainTabView(
-        recommendationViewModel: RecommendationViewModel(
-            recommendMeals: RecommendMealsFromPantryUseCase(
-                recipeRepository: MockRecipeRepository(),
-                pantryStore: pantryStore,
-                preferencesStore: preferencesStore
-            )
-        ),
+        homeViewModel: HomeViewModel(confirmedMealStore: confirmedMealStore, shoppingListStore: shoppingListStore),
         pantryViewModel: PantryViewModel(store: pantryStore),
         weeklyPlannerViewModel: WeeklyPlannerViewModel(
             recordBusyness: RecordBusynessUseCase(store: InMemoryScheduleStore()),
@@ -118,7 +112,7 @@ struct MainTabView: View {
         ),
         settingsViewModel: SettingsViewModel(store: preferencesStore),
         pantryStore: pantryStore,
-        addToShoppingList: AddMissingIngredientsToShoppingListUseCase(store: InMemoryShoppingListStore()),
-        confirmedMealStore: InMemoryConfirmedMealStore()
+        addToShoppingList: AddMissingIngredientsToShoppingListUseCase(store: shoppingListStore),
+        confirmedMealStore: confirmedMealStore
     )
 }

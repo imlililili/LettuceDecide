@@ -13,7 +13,7 @@ struct RecipeDetailViewModelTests {
         pantryStore: InMemoryPantryStore,
         shoppingListStore: InMemoryShoppingListStore = InMemoryShoppingListStore(),
         confirmedMealStore: InMemoryConfirmedMealStore = InMemoryConfirmedMealStore(),
-        context: RecipeDetailContext = .decide,
+        context: RecipeDetailContext = .confirmed(date: Date(timeIntervalSince1970: 1_700_000_000)),
         now: Date = Date(timeIntervalSince1970: 1_700_000_000)
     ) -> RecipeDetailViewModel {
         RecipeDetailViewModel(
@@ -64,16 +64,18 @@ struct RecipeDetailViewModelTests {
         #expect(viewModel.ingredientStatuses.map(\.kind) == [.have, .shortBy(have: 60, unit: .grams)])
     }
 
-    // MARK: - .decide: Mark as Cooked deducts (regression — must survive the .weekPlan work)
+    // MARK: - .confirmed: Mark as Cooked deducts once the day has arrived
 
-    @Test func fromDecide_markAsCookedDeductsAndReportsSuccess() throws {
+    @Test func fromConfirmed_markAsCookedDeductsAndReportsSuccess() throws {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
         let store = InMemoryPantryStore(initial: [
             PantryIngredient(ingredientName: "flour", quantity: 500, unit: .grams, storageLocation: .pantry)
         ])
         let viewModel = makeViewModel(
             recipe([RecipeIngredient(id: 1, name: "flour", requiredQuantity: 200, unit: .grams)]),
             pantryStore: store,
-            context: .decide
+            context: .confirmed(date: now),
+            now: now
         )
 
         #expect(viewModel.canMarkAsCooked)
@@ -83,20 +85,69 @@ struct RecipeDetailViewModelTests {
         #expect(store.load().first?.quantity == 300)
     }
 
-    @Test func fromDecide_markAsCookedSurfacesInsufficientQuantityWithoutSaving() {
+    @Test func fromConfirmed_markAsCookedSurfacesInsufficientQuantityWithoutSaving() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
         let store = InMemoryPantryStore(initial: [
             PantryIngredient(ingredientName: "flour", quantity: 100, unit: .grams, storageLocation: .pantry)
         ])
         let viewModel = makeViewModel(
             recipe([RecipeIngredient(id: 1, name: "flour", requiredQuantity: 250, unit: .grams)]),
             pantryStore: store,
-            context: .decide
+            context: .confirmed(date: now),
+            now: now
         )
 
         viewModel.markAsCooked()
 
         #expect(viewModel.notice?.dismissPops == false)
         #expect(store.load().first?.quantity == 100)
+    }
+
+    @Test func fromConfirmed_aFutureDayCannotBeMarkedCooked() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let futureDay = now.addingTimeInterval(3 * 86_400)
+        let viewModel = makeViewModel(
+            recipe([RecipeIngredient(id: 1, name: "flour", requiredQuantity: 200, unit: .grams)]),
+            pantryStore: InMemoryPantryStore(),
+            context: .confirmed(date: futureDay),
+            now: now
+        )
+
+        #expect(!viewModel.canMarkAsCooked)
+    }
+
+    @Test func fromConfirmed_aPastDayCanStillBeMarkedCooked() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let yesterday = now.addingTimeInterval(-86_400)
+        let viewModel = makeViewModel(
+            recipe([RecipeIngredient(id: 1, name: "flour", requiredQuantity: 200, unit: .grams)]),
+            pantryStore: InMemoryPantryStore(),
+            context: .confirmed(date: yesterday),
+            now: now
+        )
+
+        #expect(viewModel.canMarkAsCooked)
+    }
+
+    /// There's no "confirm" action once a meal is already confirmed — `.confirmed` has no UI
+    /// path to `confirmPlannedMeal()`, but the guard itself must still hold if it's ever
+    /// called, exactly like `.weekPlan`'s own guard against a mismatched context.
+    @Test func fromConfirmed_confirmPlannedMealIsANoOp() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let confirmedMealStore = InMemoryConfirmedMealStore()
+        let viewModel = makeViewModel(
+            recipe([RecipeIngredient(id: 1, name: "flour", requiredQuantity: 200, unit: .grams)]),
+            pantryStore: InMemoryPantryStore(),
+            confirmedMealStore: confirmedMealStore,
+            context: .confirmed(date: now),
+            now: now
+        )
+
+        viewModel.confirmPlannedMeal()
+
+        #expect(!viewModel.isConfirmedForPlan)
+        #expect(confirmedMealStore.loadConfirmedMeals().isEmpty)
+        #expect(viewModel.notice == nil)
     }
 
     // MARK: - .weekPlan: confirming never touches the pantry

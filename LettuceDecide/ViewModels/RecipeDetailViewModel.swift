@@ -24,15 +24,16 @@ struct IngredientStatus: Identifiable, Equatable {
 /// Where the cook opened this recipe from — the two entry points mean two different things by
 /// "yes, this one":
 ///
-/// - `.decide`: this is today's ranked recommendation. Choosing it means cooking it *now*, so
-///   the primary action really is "I made this," and deducting from the pantry is honest.
 /// - `.weekPlan(date:)`: this is a day in the Weekly Planner's preview — a plan for a day that
 ///   may not have happened yet. Choosing it only means "yes, I'd like to have this that day";
 ///   it must not touch the pantry, because nothing has actually been cooked. Only once `date`
 ///   has arrived does "Mark as Cooked" become an honest, available action here too.
+/// - `.confirmed(date:)`: this is a meal the cook already confirmed, opened from the Home
+///   dashboard. There's nothing left to confirm — the only question is whether `date` has
+///   arrived yet, exactly the same date-gating rule as `.weekPlan` uses for "Mark as Cooked".
 enum RecipeDetailContext: Equatable {
-    case decide
     case weekPlan(date: Date)
+    case confirmed(date: Date)
 }
 
 @MainActor
@@ -107,14 +108,13 @@ final class RecipeDetailViewModel: ObservableObject {
     }
 
     /// Whether "Mark as Cooked" — the real pantry deduction — is honest to offer right now.
-    /// Always true from Decide (it's today's recommendation by definition). From a Week Plan
-    /// day, only once that day has arrived: cooking a day that hasn't happened yet isn't
-    /// something the cook could actually have done.
+    /// Only once the day has arrived: cooking a day that hasn't happened yet isn't something
+    /// the cook could actually have done. Same rule for a Week Plan preview and an
+    /// already-confirmed meal — the only thing that differs between them is whether there's
+    /// still a "confirm" action to offer.
     var canMarkAsCooked: Bool {
         switch context {
-        case .decide:
-            return true
-        case .weekPlan(let date):
+        case .weekPlan(let date), .confirmed(let date):
             return Calendar.current.startOfDay(for: date) <= Calendar.current.startOfDay(for: now)
         }
     }

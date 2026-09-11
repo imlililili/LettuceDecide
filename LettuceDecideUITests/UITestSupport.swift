@@ -34,13 +34,13 @@ class FridgeFitUITestCase: XCTestCase {
         XCTAssertTrue(app.staticTexts[name].waitForExistence(timeout: 5))
     }
 
-    /// Stocks the pantry with `name` (and optionally a quantity) starting from the Decide
-    /// tab's empty-pantry prompt.
+    /// Stocks the pantry with `name` (and optionally a quantity) starting from the Pantry
+    /// tab's own empty-pantry prompt.
     @MainActor
     func stockPantryFromEmptyState(_ app: XCUIApplication, name: String, quantity: String? = nil) {
-        XCTAssertTrue(app.buttons["Add Ingredients"].waitForExistence(timeout: 10))
-        app.buttons["Add Ingredients"].tap()
+        app.tabBars.buttons["Pantry"].tap()
         XCTAssertTrue(app.navigationBars["Pantry"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Add Ingredient"].waitForExistence(timeout: 10))
         addIngredient(app, name: name, quantity: quantity)
     }
 }
