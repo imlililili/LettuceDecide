@@ -155,4 +155,51 @@ struct GenerateWeeklyMealPlanUseCaseTests {
         #expect(!assignedIDs.contains(1))
         #expect(assignedIDs == [2])
     }
+
+    /// Regression for the Decide-tab removal: once `RecommendMealsFromPantryUseCase` is gone,
+    /// this use case is the *only* remaining gate on both the allergen/diet safety rule and
+    /// each day's `BusynessLevel` cap — nothing else re-checks them. A deliberately
+    /// adversarial pool (a recipe that's fast but unsafe, one that's safe but too slow for
+    /// `.busy`, and enough genuinely-safe-and-fast fillers) proves every assigned day still
+    /// respects both rules, across a mixed-busyness week.
+    @Test func everyAssignedDayRespectsSafetyAndThatDaysBusynessCap() async throws {
+        var preferences = UserPreferences.default
+        preferences.intolerances = [.dairy]
+
+        func fixture(_ id: Int, minutes: Int, allergens: Set<DietaryRestriction>? = []) -> PantryRecipeCandidate {
+            PantryRecipeCandidate(
+                recipe: Recipe(id: id, title: "Recipe \(id)", readyInMinutes: minutes, containsAllergens: allergens),
+                usedIngredientNames: ["onion"],
+                missedIngredients: []
+            )
+        }
+
+        // Would fill any .busy day if the safety rule were skipped.
+        let unsafeButQuick = fixture(101, minutes: 10, allergens: [.dairy])
+        // Safe, but only .relaxed is loose enough for it.
+        let safeButSlow = fixture(102, minutes: 60)
+        // Safe and quick enough to fit even .busy.
+        let safeQuickFillers = (1...5).map { fixture($0, minutes: 15) }
+        // Safe, fits .normal/.relaxed but not .busy.
+        let safeMediumFillers = (6...10).map { fixture($0, minutes: 35) }
+
+        let (useCase, _) = makeUseCase(
+            candidates: [unsafeButQuick, safeButSlow] + safeQuickFillers + safeMediumFillers,
+            preferences: preferences
+        )
+        let mixedBusyness = zip([BusynessLevel.busy, .normal, .relaxed, .busy, .normal, .relaxed, .busy], 0..<7).map {
+            level, offset in
+            ScheduleEntry(date: monday.addingTimeInterval(Double(offset) * 86_400), busyness: level, calendar: utc)
+        }
+
+        let plan = try await useCase.execute(week: mixedBusyness, now: monday)
+
+        #expect(plan.days.contains { $0.assignedRecipe != nil }) // sanity: the pool isn't degenerate
+        for day in plan.days {
+            guard let recipe = day.assignedRecipe else { continue }
+            #expect(recipe.isSafe(for: preferences.intolerances), "day \(day.date) was assigned an unsafe recipe")
+            #expect(day.busyness.permits(recipe), "day \(day.date) was assigned a recipe over its busyness cap")
+            #expect(recipe.id != 101, "the unsafe recipe must never be picked, however well it fits a busy day")
+        }
+    }
 }

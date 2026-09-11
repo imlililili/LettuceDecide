@@ -6,6 +6,7 @@ struct RecommendationView: View {
     @ObservedObject var viewModel: RecommendationViewModel
     let pantryStore: PantryStoring
     let addToShoppingList: AddMissingIngredientsToShoppingListUseCase
+    let confirmedMealStore: ConfirmedMealStoring
     /// Called when the cook has no pantry to recommend from — the shell switches to the
     /// Pantry tab.
     let onNeedsPantry: () -> Void
@@ -40,6 +41,7 @@ struct RecommendationView: View {
                                 recipe: result.recipe,
                                 pantryStore: pantryStore,
                                 addToShoppingList: addToShoppingList,
+                                confirmedMealStore: confirmedMealStore,
                                 context: .decide
                             ),
                             onCooked: {
@@ -86,6 +88,7 @@ struct RecommendationView: View {
             ),
             pantryStore: pantryStore,
             addToShoppingList: AddMissingIngredientsToShoppingListUseCase(store: InMemoryShoppingListStore()),
+            confirmedMealStore: InMemoryConfirmedMealStore(),
             onNeedsPantry: {}
         )
     }

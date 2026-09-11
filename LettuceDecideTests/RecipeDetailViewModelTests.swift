@@ -12,6 +12,7 @@ struct RecipeDetailViewModelTests {
         _ recipe: Recipe,
         pantryStore: InMemoryPantryStore,
         shoppingListStore: InMemoryShoppingListStore = InMemoryShoppingListStore(),
+        confirmedMealStore: InMemoryConfirmedMealStore = InMemoryConfirmedMealStore(),
         context: RecipeDetailContext = .decide,
         now: Date = Date(timeIntervalSince1970: 1_700_000_000)
     ) -> RecipeDetailViewModel {
@@ -19,6 +20,7 @@ struct RecipeDetailViewModelTests {
             recipe: recipe,
             pantryStore: pantryStore,
             addToShoppingList: AddMissingIngredientsToShoppingListUseCase(store: shoppingListStore),
+            confirmedMealStore: confirmedMealStore,
             context: context,
             now: now
         )
@@ -134,6 +136,52 @@ struct RecipeDetailViewModelTests {
         #expect(viewModel.notice?.dismissPops == false)
         // The whole point of the bug fix: confirming a planned day is not cooking it.
         #expect(store.load().first?.quantity == 500)
+    }
+
+    @Test func fromWeekPlan_confirmingDurablyRecordsTheConfirmedMealAndItsShortfall() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let futureDay = now.addingTimeInterval(3 * 86_400)
+        let confirmedMealStore = InMemoryConfirmedMealStore()
+        let shoppingListStore = InMemoryShoppingListStore()
+        let curry = recipe([
+            RecipeIngredient(id: 1, name: "flour", requiredQuantity: 200, unit: .grams),
+            RecipeIngredient(id: 2, name: "sugar", requiredQuantity: 100, unit: .grams),
+        ])
+        let viewModel = makeViewModel(
+            curry,
+            pantryStore: InMemoryPantryStore(initial: [
+                PantryIngredient(ingredientName: "flour", quantity: 500, unit: .grams, storageLocation: .pantry)
+            ]),
+            shoppingListStore: shoppingListStore,
+            confirmedMealStore: confirmedMealStore,
+            context: .weekPlan(date: futureDay),
+            now: now
+        )
+
+        viewModel.confirmPlannedMeal()
+
+        #expect(confirmedMealStore.loadConfirmedMeals().map(\.recipe.id) == [curry.id])
+        // flour is fully on hand (no shortfall); sugar isn't in the pantry at all.
+        #expect(shoppingListStore.loadItems().map(\.ingredientName) == ["sugar"])
+    }
+
+    @Test func fromWeekPlan_reopeningAnAlreadyConfirmedDayStartsAsConfirmed() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let futureDay = now.addingTimeInterval(3 * 86_400)
+        let curry = recipe([RecipeIngredient(id: 1, name: "flour", requiredQuantity: 200, unit: .grams)])
+        let confirmedMealStore = InMemoryConfirmedMealStore(initial: [
+            ConfirmedMeal(date: futureDay, recipe: curry, confirmedAt: now)
+        ])
+
+        let viewModel = makeViewModel(
+            curry,
+            pantryStore: InMemoryPantryStore(),
+            confirmedMealStore: confirmedMealStore,
+            context: .weekPlan(date: futureDay),
+            now: now
+        )
+
+        #expect(viewModel.isConfirmedForPlan)
     }
 
     @Test func fromWeekPlan_aDayThatHasAlreadyArrivedCanStillBeMarkedCooked() throws {

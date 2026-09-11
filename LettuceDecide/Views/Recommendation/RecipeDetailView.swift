@@ -265,6 +265,7 @@ private struct IngredientStatusRow: View {
                     PantryIngredient(ingredientName: "spinach", quantity: 200, unit: .grams, storageLocation: .fridge),
                 ]),
                 addToShoppingList: AddMissingIngredientsToShoppingListUseCase(store: InMemoryShoppingListStore()),
+                confirmedMealStore: InMemoryConfirmedMealStore(),
                 context: .decide
             ),
             onCooked: {}
@@ -281,6 +282,7 @@ private struct IngredientStatusRow: View {
                     PantryIngredient(ingredientName: "chickpeas", quantity: 200, unit: .grams, storageLocation: .pantry),
                 ]),
                 addToShoppingList: AddMissingIngredientsToShoppingListUseCase(store: InMemoryShoppingListStore()),
+                confirmedMealStore: InMemoryConfirmedMealStore(),
                 context: .weekPlan(date: Date().addingTimeInterval(3 * 86_400))
             ),
             onCooked: {}
