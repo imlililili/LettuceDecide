@@ -5,6 +5,7 @@ import SwiftUI
 struct WeeklyPlannerView: View {
     @ObservedObject var viewModel: WeeklyPlannerViewModel
     let addToShoppingList: AddMissingIngredientsToShoppingListUseCase
+    let confirmedMealStore: ConfirmedMealStoring
 
     var body: some View {
         Form {
@@ -44,7 +45,8 @@ struct WeeklyPlannerView: View {
                 WeekPlanView(
                     plan: plan,
                     pantryStore: viewModel.pantryStore,
-                    addToShoppingList: addToShoppingList
+                    addToShoppingList: addToShoppingList,
+                    confirmedMealStore: confirmedMealStore
                 )
             }
         }
@@ -118,7 +120,8 @@ private struct DayBusynessRow: View {
                 ),
                 pantryStore: pantryStore
             ),
-            addToShoppingList: AddMissingIngredientsToShoppingListUseCase(store: InMemoryShoppingListStore())
+            addToShoppingList: AddMissingIngredientsToShoppingListUseCase(store: InMemoryShoppingListStore()),
+            confirmedMealStore: InMemoryConfirmedMealStore()
         )
     }
 }

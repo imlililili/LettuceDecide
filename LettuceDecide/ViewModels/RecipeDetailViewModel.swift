@@ -43,6 +43,7 @@ final class RecipeDetailViewModel: ObservableObject {
     private let pantryStore: PantryStoring
     private let updateInventory: UpdateInventoryAfterCookingUseCase
     private let addToShoppingList: AddMissingIngredientsToShoppingListUseCase
+    private let confirmPlannedMealUseCase: ConfirmPlannedMealUseCase
     private let now: Date
     private var pantryChangeCancellable: AnyCancellable?
 
@@ -51,10 +52,10 @@ final class RecipeDetailViewModel: ObservableObject {
     /// on the Pantry tab and comes back, the ticks are already right.
     @Published private var pantry: [PantryIngredient]
 
-    /// Set once the cook confirms a `.weekPlan` day's recipe. Purely a UI acknowledgement —
-    /// the plan itself is a regenerated-on-demand preview with nowhere durable to persist
-    /// "confirmed" against, so this doesn't touch the pantry or any store. It exists only so
-    /// the screen can say "planned" back to the cook and disable a re-tap.
+    /// Set once the cook confirms a `.weekPlan` day's recipe — mirrors what
+    /// `ConfirmPlannedMealUseCase` just durably recorded via `ConfirmedMealStoring`. It exists
+    /// on the view model too (rather than being re-derived from the store on every render) so
+    /// the screen can say "planned" back to the cook and disable a re-tap without a reload.
     @Published private(set) var isConfirmedForPlan = false
 
     @Published var notice: Notice?
@@ -71,6 +72,7 @@ final class RecipeDetailViewModel: ObservableObject {
         recipe: Recipe,
         pantryStore: PantryStoring,
         addToShoppingList: AddMissingIngredientsToShoppingListUseCase,
+        confirmedMealStore: ConfirmedMealStoring,
         context: RecipeDetailContext,
         now: Date = Date()
     ) {
@@ -78,9 +80,23 @@ final class RecipeDetailViewModel: ObservableObject {
         self.pantryStore = pantryStore
         self.updateInventory = UpdateInventoryAfterCookingUseCase(store: pantryStore)
         self.addToShoppingList = addToShoppingList
+        self.confirmPlannedMealUseCase = ConfirmPlannedMealUseCase(
+            confirmedMealStore: confirmedMealStore,
+            pantryStore: pantryStore,
+            addToShoppingList: addToShoppingList
+        )
         self.context = context
         self.now = now
         self.pantry = pantryStore.load()
+
+        // Reopening a day that was already confirmed earlier (a different session, or just
+        // scrolling back) should show "planned" from the start, not offer to confirm again.
+        if case .weekPlan(let date) = context {
+            let key = Calendar.current.startOfDay(for: date)
+            self.isConfirmedForPlan = confirmedMealStore.loadConfirmedMeals()
+                .first(where: { $0.id == key })?.recipe.id == recipe.id
+        }
+
         pantryChangeCancellable = pantryStore.changes
             .sink { [weak self] in
                 MainActor.assumeIsolated {
@@ -132,6 +148,7 @@ final class RecipeDetailViewModel: ObservableObject {
     /// the cook actually marks it cooked (see `canMarkAsCooked`).
     func confirmPlannedMeal() {
         guard case .weekPlan(let date) = context else { return }
+        confirmPlannedMealUseCase.execute(recipe: recipe, date: date, now: now)
         isConfirmedForPlan = true
         let weekday = date.formatted(.dateTime.weekday(.wide))
         notice = Notice(

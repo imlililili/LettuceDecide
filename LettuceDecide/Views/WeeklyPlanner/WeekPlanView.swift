@@ -9,6 +9,7 @@ struct WeekPlanView: View {
     let plan: WeeklyMealPlan
     let pantryStore: PantryStoring
     let addToShoppingList: AddMissingIngredientsToShoppingListUseCase
+    let confirmedMealStore: ConfirmedMealStoring
 
     @State private var addedCount: Int?
 
@@ -30,6 +31,7 @@ struct WeekPlanView: View {
                                     recipe: recipe,
                                     pantryStore: pantryStore,
                                     addToShoppingList: addToShoppingList,
+                                    confirmedMealStore: confirmedMealStore,
                                     context: .weekPlan(date: day.date)
                                 ),
                                 onCooked: {}
@@ -138,7 +140,8 @@ private struct DayRow: View {
         WeekPlanView(
             plan: plan,
             pantryStore: InMemoryPantryStore(),
-            addToShoppingList: AddMissingIngredientsToShoppingListUseCase(store: InMemoryShoppingListStore())
+            addToShoppingList: AddMissingIngredientsToShoppingListUseCase(store: InMemoryShoppingListStore()),
+            confirmedMealStore: InMemoryConfirmedMealStore()
         )
     }
 }
