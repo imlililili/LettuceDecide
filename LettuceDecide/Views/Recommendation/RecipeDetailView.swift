@@ -58,18 +58,50 @@ struct RecipeDetailView: View {
         }
     }
 
+    @ViewBuilder
     private var cookBar: some View {
-        Button {
-            viewModel.markAsCooked()
-        } label: {
-            Text("Mark as Cooked")
+        switch viewModel.context {
+        case .decide:
+            VStack(spacing: 8) {
+                primaryButton("Mark as Cooked") { viewModel.markAsCooked() }
+            }
+            .padding()
+            .background(.bar)
+
+        case .weekPlan(let date):
+            VStack(spacing: 8) {
+                primaryButton(planButtonTitle(for: date), disabled: viewModel.isConfirmedForPlan) {
+                    viewModel.confirmPlannedMeal()
+                }
+                // Only offered once the planned day has actually arrived — cooking a day that
+                // hasn't happened yet isn't something the cook could honestly have done.
+                if viewModel.canMarkAsCooked {
+                    Button("Mark as Cooked") {
+                        viewModel.markAsCooked()
+                    }
+                    .font(.subheadline)
+                }
+            }
+            .padding()
+            .background(.bar)
+        }
+    }
+
+    private func primaryButton(_ title: String, disabled: Bool = false, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
                 .font(.headline)
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 6)
         }
         .buttonStyle(.borderedProminent)
-        .padding()
-        .background(.bar)
+        .disabled(disabled)
+    }
+
+    private func planButtonTitle(for date: Date) -> String {
+        viewModel.isConfirmedForPlan
+            ? "Planned for \(date.formatted(.dateTime.weekday(.wide))) ✓"
+            : "Plan This for \(date.formatted(.dateTime.weekday(.wide)))"
     }
 
     private var header: some View {
@@ -223,7 +255,7 @@ private struct IngredientStatusRow: View {
     }
 }
 
-#Preview {
+#Preview("From Decide") {
     NavigationStack {
         RecipeDetailView(
             viewModel: RecipeDetailViewModel(
@@ -232,7 +264,24 @@ private struct IngredientStatusRow: View {
                     PantryIngredient(ingredientName: "chickpeas", quantity: 200, unit: .grams, storageLocation: .pantry),
                     PantryIngredient(ingredientName: "spinach", quantity: 200, unit: .grams, storageLocation: .fridge),
                 ]),
-                addToShoppingList: AddMissingIngredientsToShoppingListUseCase(store: InMemoryShoppingListStore())
+                addToShoppingList: AddMissingIngredientsToShoppingListUseCase(store: InMemoryShoppingListStore()),
+                context: .decide
+            ),
+            onCooked: {}
+        )
+    }
+}
+
+#Preview("From Week Plan — a future day") {
+    NavigationStack {
+        RecipeDetailView(
+            viewModel: RecipeDetailViewModel(
+                recipe: MockRecipeRepository.sampleRecipes[1],
+                pantryStore: InMemoryPantryStore(initial: [
+                    PantryIngredient(ingredientName: "chickpeas", quantity: 200, unit: .grams, storageLocation: .pantry),
+                ]),
+                addToShoppingList: AddMissingIngredientsToShoppingListUseCase(store: InMemoryShoppingListStore()),
+                context: .weekPlan(date: Date().addingTimeInterval(3 * 86_400))
             ),
             onCooked: {}
         )

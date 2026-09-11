@@ -21,19 +21,41 @@ struct IngredientStatus: Identifiable, Equatable {
     }
 }
 
+/// Where the cook opened this recipe from — the two entry points mean two different things by
+/// "yes, this one":
+///
+/// - `.decide`: this is today's ranked recommendation. Choosing it means cooking it *now*, so
+///   the primary action really is "I made this," and deducting from the pantry is honest.
+/// - `.weekPlan(date:)`: this is a day in the Weekly Planner's preview — a plan for a day that
+///   may not have happened yet. Choosing it only means "yes, I'd like to have this that day";
+///   it must not touch the pantry, because nothing has actually been cooked. Only once `date`
+///   has arrived does "Mark as Cooked" become an honest, available action here too.
+enum RecipeDetailContext: Equatable {
+    case decide
+    case weekPlan(date: Date)
+}
+
 @MainActor
 final class RecipeDetailViewModel: ObservableObject {
     let recipe: Recipe
+    let context: RecipeDetailContext
 
     private let pantryStore: PantryStoring
     private let updateInventory: UpdateInventoryAfterCookingUseCase
     private let addToShoppingList: AddMissingIngredientsToShoppingListUseCase
+    private let now: Date
     private var pantryChangeCancellable: AnyCancellable?
 
     /// The pantry as it stands now. Refreshed whenever the store announces a change, so the
     /// checklist re-derives against live inventory — if the cook adds a missing ingredient
     /// on the Pantry tab and comes back, the ticks are already right.
     @Published private var pantry: [PantryIngredient]
+
+    /// Set once the cook confirms a `.weekPlan` day's recipe. Purely a UI acknowledgement —
+    /// the plan itself is a regenerated-on-demand preview with nowhere durable to persist
+    /// "confirmed" against, so this doesn't touch the pantry or any store. It exists only so
+    /// the screen can say "planned" back to the cook and disable a re-tap.
+    @Published private(set) var isConfirmedForPlan = false
 
     @Published var notice: Notice?
 
@@ -48,12 +70,16 @@ final class RecipeDetailViewModel: ObservableObject {
     init(
         recipe: Recipe,
         pantryStore: PantryStoring,
-        addToShoppingList: AddMissingIngredientsToShoppingListUseCase
+        addToShoppingList: AddMissingIngredientsToShoppingListUseCase,
+        context: RecipeDetailContext,
+        now: Date = Date()
     ) {
         self.recipe = recipe
         self.pantryStore = pantryStore
         self.updateInventory = UpdateInventoryAfterCookingUseCase(store: pantryStore)
         self.addToShoppingList = addToShoppingList
+        self.context = context
+        self.now = now
         self.pantry = pantryStore.load()
         pantryChangeCancellable = pantryStore.changes
             .sink { [weak self] in
@@ -62,6 +88,19 @@ final class RecipeDetailViewModel: ObservableObject {
                     self.pantry = self.pantryStore.load()
                 }
             }
+    }
+
+    /// Whether "Mark as Cooked" — the real pantry deduction — is honest to offer right now.
+    /// Always true from Decide (it's today's recommendation by definition). From a Week Plan
+    /// day, only once that day has arrived: cooking a day that hasn't happened yet isn't
+    /// something the cook could actually have done.
+    var canMarkAsCooked: Bool {
+        switch context {
+        case .decide:
+            return true
+        case .weekPlan(let date):
+            return Calendar.current.startOfDay(for: date) <= Calendar.current.startOfDay(for: now)
+        }
     }
 
     /// The recipe matched against the current pantry — recomputed on every access, so it
@@ -86,6 +125,20 @@ final class RecipeDetailViewModel: ObservableObject {
     /// list" action would add.
     var missingIngredients: [RecipeIngredient] {
         currentMatch.missingIngredients
+    }
+
+    /// Records that the cook wants to eat this recipe on its planned day. Only meaningful for
+    /// `.weekPlan` — never deducts from the pantry; that only happens when the day arrives and
+    /// the cook actually marks it cooked (see `canMarkAsCooked`).
+    func confirmPlannedMeal() {
+        guard case .weekPlan(let date) = context else { return }
+        isConfirmedForPlan = true
+        let weekday = date.formatted(.dateTime.weekday(.wide))
+        notice = Notice(
+            title: "Planned",
+            message: "\(recipe.title) is planned for \(weekday). Nothing has been taken from your pantry yet.",
+            dismissPops: false
+        )
     }
 
     func markAsCooked() {

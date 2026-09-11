@@ -26,7 +26,15 @@ final class SpoonacularRecipeRepository: RecipeRepository {
         )!
         var items: [URLQueryItem] = [
             URLQueryItem(name: "apiKey", value: apiKey),
-            URLQueryItem(name: "number", value: "12"),
+            // Spoonacular caps `number` at 100 for complexSearch, and we deliberately ask for
+            // the max. A large share of its results carry no real prep-time data and get a
+            // generic 45-minute placeholder for `readyInMinutes` — which fails both busyness
+            // caps (.normal ≤40, .busy ≤20) — so genuinely fast-declared recipes are a thin
+            // slice of any response (diagnosed live: ~12 non-placeholder results out of 100).
+            // The weekly planner also needs enough distinct candidates to fill 7 days without
+            // repeating a recipe. A small pool starves both; this one call is only made when
+            // the cook explicitly asks for recommendations or a weekly plan, not on a timer.
+            URLQueryItem(name: "number", value: "100"),
             URLQueryItem(name: "sort", value: "min-missing-ingredients"),
             URLQueryItem(name: "addRecipeInformation", value: "true"),
             // Without this, complexSearch omits analyzedInstructions/instructions

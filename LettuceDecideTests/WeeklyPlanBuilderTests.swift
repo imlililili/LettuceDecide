@@ -61,6 +61,34 @@ struct WeeklyPlanBuilderTests {
         #expect(Set(ids).count == 7)
     }
 
+    /// Regression for a real bug: with only a handful of candidates, most of which carry a
+    /// slow (or Spoonacular's generic ~45-minute placeholder) `readyInMinutes`, four `.normal`
+    /// days in a row came back "no match" even though .normal's cap (≤40 min) is meant to be
+    /// easy to satisfy. The fix was widening the upstream candidate pool, not the builder — so
+    /// this proves the *assignment* logic itself has no bug once the pool is healthy: given a
+    /// realistic-sized pool (18 candidates, mostly slow, a real minority fast) it fills every
+    /// day of the exact busyness pattern that failed live (relaxed/busy/normal×4/relaxed).
+    @Test func fillsAllSevenDaysWhenTheCandidatePoolIsRealisticallySized() {
+        // Mirrors what a live Spoonacular response actually looks like: most results carry no
+        // real timing data and land on a slow/placeholder duration; only a minority are fast.
+        let slowFiller = (1...10).map { candidate(recipe($0, minutes: 45)) }
+        let normalEligible = (11...14).map { candidate(recipe($0, minutes: 35)) }
+        let busyEligible = (15...16).map {
+            candidate(recipe($0, minutes: 15, ingredients: (0..<3).map { i in ingredient(i, "ing \(i)", 1, .pieces) }))
+        }
+        let moreFiller = (17...18).map { candidate(recipe($0, minutes: 45)) }
+        let pool = slowFiller + normalEligible + busyEligible + moreFiller
+        #expect(pool.count == 18)
+
+        let busyness = week([.relaxed, .busy, .normal, .normal, .relaxed, .normal, .normal])
+
+        let plan = WeeklyPlanBuilder.build(candidates: pool, busyness: busyness, startingFrom: [], now: now)
+
+        #expect(plan.days.allSatisfy { $0.assignedRecipe != nil })
+        let assignedIDs = plan.days.compactMap { $0.assignedRecipe?.id }
+        #expect(Set(assignedIDs).count == 7) // no repeats either
+    }
+
     @Test func daysAreOrderedMondayToSunday() {
         let plan = WeeklyPlanBuilder.build(
             candidates: (1...7).map { candidate(recipe($0)) },
