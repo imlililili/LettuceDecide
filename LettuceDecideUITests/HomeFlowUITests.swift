@@ -1,0 +1,49 @@
+import XCTest
+
+/// The Home dashboard: confirmed Week Plan meals and the persisted shopping list built from
+/// confirming them — backed by `ConfirmedMealStoring` and `ConfirmPlannedMealUseCase`.
+final class HomeFlowUITests: FridgeFitUITestCase {
+    @MainActor
+    func testHomeShowsAnEmptyStateUntilADayIsConfirmed() throws {
+        let app = launchApp()
+
+        stockPantryFromEmptyState(app, name: "chickpeas")
+        app.tabBars.buttons["Home"].tap()
+
+        XCTAssertTrue(app.staticTexts["No confirmed meals yet"].waitForExistence(timeout: 5))
+
+        app.buttons["Plan My Week"].tap()
+        XCTAssertTrue(app.navigationBars["Weekly Planner"].waitForExistence(timeout: 5))
+    }
+
+    @MainActor
+    func testConfirmingADayShowsItOnHomeWithItsNettedShortfallOnTheShoppingList() throws {
+        let app = launchApp()
+
+        stockPantryFromEmptyState(app, name: "chickpeas", quantity: "1000")
+
+        app.tabBars.buttons["Calendar"].tap()
+        XCTAssertTrue(app.navigationBars["Weekly Planner"].waitForExistence(timeout: 5))
+        app.buttons["Generate This Week's Plan"].tap()
+        XCTAssertTrue(app.navigationBars["This Week's Plan"].waitForExistence(timeout: 20))
+
+        let curry = app.staticTexts["Chickpea and Spinach Curry"]
+        XCTAssertTrue(curry.waitForExistence(timeout: 5))
+        curry.tap()
+
+        let planButton = app.buttons.matching(
+            NSPredicate(format: "label BEGINSWITH %@", "Plan This for")
+        ).firstMatch
+        XCTAssertTrue(planButton.waitForExistence(timeout: 5))
+        planButton.tap()
+        app.buttons["OK"].tap()
+
+        app.tabBars.buttons["Home"].tap()
+
+        XCTAssertTrue(curry.waitForExistence(timeout: 5))
+        // Curry needs curry powder, which the pantry never had — it belongs on the shopping
+        // list. Chickpeas (1000g on hand, 400g needed) must NOT show up as a shortfall.
+        XCTAssertTrue(app.staticTexts["curry powder"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.staticTexts["chickpeas"].exists)
+    }
+}

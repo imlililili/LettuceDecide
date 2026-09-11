@@ -48,12 +48,9 @@ struct ContentView: View {
 
     var body: some View {
         MainTabView(
-            recommendationViewModel: RecommendationViewModel(
-                recommendMeals: RecommendMealsFromPantryUseCase(
-                    recipeRepository: repository,
-                    pantryStore: pantryStore,
-                    preferencesStore: preferencesStore
-                )
+            homeViewModel: HomeViewModel(
+                confirmedMealStore: confirmedMealStore,
+                shoppingListStore: shoppingListStore
             ),
             pantryViewModel: PantryViewModel(store: pantryStore),
             weeklyPlannerViewModel: WeeklyPlannerViewModel(

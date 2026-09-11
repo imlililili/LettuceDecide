@@ -6,10 +6,9 @@ final class PantryFlowUITests: FridgeFitUITestCase {
     func testEmptyPantryPromptsToAddIngredients() throws {
         let app = launchApp()
 
-        // The Decide list loads on appear; an empty pantry offers "Add Ingredients", not a
-        // pointless retry.
-        XCTAssertTrue(app.buttons["Add Ingredients"].waitForExistence(timeout: 10))
-        XCTAssertFalse(app.buttons["Try Again"].exists)
+        app.tabBars.buttons["Pantry"].tap()
+        XCTAssertTrue(app.staticTexts["Your pantry is empty"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["Add Ingredient"].exists)
     }
 
     @MainActor

@@ -61,13 +61,6 @@ struct RecipeDetailView: View {
     @ViewBuilder
     private var cookBar: some View {
         switch viewModel.context {
-        case .decide:
-            VStack(spacing: 8) {
-                primaryButton("Mark as Cooked") { viewModel.markAsCooked() }
-            }
-            .padding()
-            .background(.bar)
-
         case .weekPlan(let date):
             VStack(spacing: 8) {
                 primaryButton(planButtonTitle(for: date), disabled: viewModel.isConfirmedForPlan) {
@@ -84,6 +77,17 @@ struct RecipeDetailView: View {
             }
             .padding()
             .background(.bar)
+
+        case .confirmed:
+            // Already confirmed — nothing left to confirm. Once the day arrives, the cook can
+            // say they actually cooked it; before that, this is browsing only.
+            if viewModel.canMarkAsCooked {
+                VStack(spacing: 8) {
+                    primaryButton("Mark as Cooked") { viewModel.markAsCooked() }
+                }
+                .padding()
+                .background(.bar)
+            }
         }
     }
 
@@ -255,7 +259,7 @@ private struct IngredientStatusRow: View {
     }
 }
 
-#Preview("From Decide") {
+#Preview("From Home — a confirmed, already-arrived day") {
     NavigationStack {
         RecipeDetailView(
             viewModel: RecipeDetailViewModel(
@@ -266,7 +270,7 @@ private struct IngredientStatusRow: View {
                 ]),
                 addToShoppingList: AddMissingIngredientsToShoppingListUseCase(store: InMemoryShoppingListStore()),
                 confirmedMealStore: InMemoryConfirmedMealStore(),
-                context: .decide
+                context: .confirmed(date: Date())
             ),
             onCooked: {}
         )

@@ -24,7 +24,7 @@ final class SettingsFlowUITests: FridgeFitUITestCase {
         dairyToggle.flipSwitch()
 
         // Leave and come back to the Settings tab.
-        app.tabBars.buttons["Decide"].tap()
+        app.tabBars.buttons["Home"].tap()
         app.tabBars.buttons["Settings"].tap()
 
         let reopenedToggle = app.switches["Dairy"]
