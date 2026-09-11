@@ -7,26 +7,14 @@ final class CookingAndShoppingFlowUITests: FridgeFitUITestCase {
     func testMarkingARecipeAsCookedDeductsFromThePantry() throws {
         let app = launchApp()
 
-        XCTAssertTrue(app.buttons["Add Ingredients"].waitForExistence(timeout: 10))
-        app.buttons["Add Ingredients"].tap()
-        XCTAssertTrue(app.navigationBars["Pantry"].waitForExistence(timeout: 5))
-        app.buttons["Add Ingredient"].firstMatch.tap()
-
-        let nameField = app.textFields["Ingredient"]
-        XCTAssertTrue(nameField.waitForExistence(timeout: 5))
-        nameField.tap()
-        nameField.typeText("chickpeas")
-        let quantityField = app.textFields["Quantity"]
-        quantityField.clearText()
-        quantityField.typeText("1000")
-        app.buttons["Save"].tap()
-
+        stockPantryFromEmptyState(app, name: "chickpeas", quantity: "1000")
         app.tabBars.buttons["Decide"].tap()
 
         let curry = app.staticTexts["Chickpea and Spinach Curry"]
         XCTAssertTrue(curry.waitForExistence(timeout: 10))
         curry.tap()
 
+        // From Decide, cooking it now is the honest primary action.
         let cookButton = app.buttons["Mark as Cooked"]
         XCTAssertTrue(cookButton.waitForExistence(timeout: 5))
         cookButton.tap()

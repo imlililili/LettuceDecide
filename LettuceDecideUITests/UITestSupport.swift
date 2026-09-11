@@ -17,25 +17,31 @@ class FridgeFitUITestCase: XCTestCase {
     }
 
     /// From the Pantry tab (or its empty state), opens the Add Ingredient sheet, fills the
-    /// name, saves, and waits for the row to appear.
+    /// name (and optionally a quantity), saves, and waits for the row to appear.
     @MainActor
-    func addIngredient(_ app: XCUIApplication, name: String) {
+    func addIngredient(_ app: XCUIApplication, name: String, quantity: String? = nil) {
         app.buttons["Add Ingredient"].firstMatch.tap()
         let nameField = app.textFields["Ingredient"]
         XCTAssertTrue(nameField.waitForExistence(timeout: 5))
         nameField.tap()
         nameField.typeText(name)
+        if let quantity {
+            let quantityField = app.textFields["Quantity"]
+            quantityField.clearText()
+            quantityField.typeText(quantity)
+        }
         app.buttons["Save"].tap()
         XCTAssertTrue(app.staticTexts[name].waitForExistence(timeout: 5))
     }
 
-    /// Stocks the pantry with `name` starting from the Decide tab's empty-pantry prompt.
+    /// Stocks the pantry with `name` (and optionally a quantity) starting from the Decide
+    /// tab's empty-pantry prompt.
     @MainActor
-    func stockPantryFromEmptyState(_ app: XCUIApplication, name: String) {
+    func stockPantryFromEmptyState(_ app: XCUIApplication, name: String, quantity: String? = nil) {
         XCTAssertTrue(app.buttons["Add Ingredients"].waitForExistence(timeout: 10))
         app.buttons["Add Ingredients"].tap()
         XCTAssertTrue(app.navigationBars["Pantry"].waitForExistence(timeout: 5))
-        addIngredient(app, name: name)
+        addIngredient(app, name: name, quantity: quantity)
     }
 }
 

@@ -39,7 +39,8 @@ struct RecommendationView: View {
                             viewModel: RecipeDetailViewModel(
                                 recipe: result.recipe,
                                 pantryStore: pantryStore,
-                                addToShoppingList: addToShoppingList
+                                addToShoppingList: addToShoppingList,
+                                context: .decide
                             ),
                             onCooked: {
                                 Task { await viewModel.decide() }

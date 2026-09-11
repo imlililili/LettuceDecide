@@ -29,7 +29,8 @@ struct WeekPlanView: View {
                                 viewModel: RecipeDetailViewModel(
                                     recipe: recipe,
                                     pantryStore: pantryStore,
-                                    addToShoppingList: addToShoppingList
+                                    addToShoppingList: addToShoppingList,
+                                    context: .weekPlan(date: day.date)
                                 ),
                                 onCooked: {}
                             )
