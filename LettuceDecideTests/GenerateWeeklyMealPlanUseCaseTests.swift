@@ -112,6 +112,41 @@ struct GenerateWeeklyMealPlanUseCaseTests {
         }
     }
 
+    /// Regression for a real incident: a malformed API key produced an HTTP 401
+    /// (`RecipeRepositoryError.requestFailed`), but the cook — and the developer debugging
+    /// it — only ever saw "Couldn't reach the recipe service. Check your connection and try
+    /// again.", which sent the investigation toward a network problem that didn't exist. A
+    /// non-network repository error must surface its own real cause instead.
+    @Test func errorDescriptionSurfacesTheRealCauseForANonNetworkRepositoryError() async {
+        let (useCase, _) = makeUseCase(repositoryError: RecipeRepositoryError.requestFailed(statusCode: 401))
+
+        do {
+            _ = try await useCase.execute(week: week(7), now: monday)
+            Issue.record("expected recommendationServiceUnavailable")
+        } catch let error as WeeklyMealPlanError {
+            let message = error.errorDescription ?? ""
+            #expect(message.contains("401"))
+            #expect(!message.contains("Check your connection"))
+        } catch {
+            Issue.record("unexpected error: \(error)")
+        }
+    }
+
+    @Test func errorDescriptionKeepsTheHonestConnectionMessageForAGenuineNetworkFailure() async {
+        let (useCase, _) = makeUseCase(
+            repositoryError: RecipeRepositoryError.network(URLError(.notConnectedToInternet))
+        )
+
+        do {
+            _ = try await useCase.execute(week: week(7), now: monday)
+            Issue.record("expected recommendationServiceUnavailable")
+        } catch let error as WeeklyMealPlanError {
+            #expect(error.errorDescription == "Couldn't reach the recipe service. Check your connection and try again.")
+        } catch {
+            Issue.record("unexpected error: \(error)")
+        }
+    }
+
     @Test func leavesTheRealPantryUntouched() async throws {
         let (useCase, store) = makeUseCase(
             pantry: [

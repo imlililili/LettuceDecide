@@ -12,8 +12,21 @@ enum WeeklyMealPlanError: LocalizedError {
             return "You haven't added anything to your pantry yet. Add a few ingredients so FridgeFit can plan your week."
         case .incompleteWeek(let daysProvided):
             return "Set how busy you'll be for all 7 days first (you've set \(daysProvided))."
-        case .recommendationServiceUnavailable:
-            return "Couldn't reach the recipe service. Check your connection and try again."
+        case .recommendationServiceUnavailable(let underlying):
+            // "Check your connection" is only honest for a genuine connectivity failure. A bad
+            // API key, a non-2xx response, or a response the app couldn't parse are different
+            // problems with different fixes — collapsing them into one network-sounding
+            // message wastes debugging time chasing the wrong cause (regression: a corrupted
+            // API key surfaced as this exact message and looked like a network outage).
+            guard let repositoryError = underlying as? RecipeRepositoryError else {
+                return "Couldn't reach the recipe service. Check your connection and try again."
+            }
+            switch repositoryError {
+            case .network:
+                return "Couldn't reach the recipe service. Check your connection and try again."
+            case .missingAPIKey, .invalidResponse, .requestFailed, .noResultsFound:
+                return repositoryError.errorDescription
+            }
         }
     }
 }
