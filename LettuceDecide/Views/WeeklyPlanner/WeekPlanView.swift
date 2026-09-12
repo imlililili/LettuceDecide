@@ -48,12 +48,7 @@ struct WeekPlanView: View {
             if !plan.shoppingList.isEmpty {
                 Section("Shopping list") {
                     ForEach(plan.shoppingList) { item in
-                        HStack {
-                            Text(item.ingredientName)
-                            Spacer()
-                            Text("\(Self.number(item.requiredQuantity)) \(item.unit.displayName)")
-                                .foregroundStyle(.secondary)
-                        }
+                        ShoppingListItemRow(item: item)
                     }
                     Button {
                         let list = addToShoppingList.execute(adding: plan.shoppingList)
@@ -80,10 +75,6 @@ struct WeekPlanView: View {
         } message: {
             Text("Your shopping list now has \(addedCount ?? 0) item\((addedCount ?? 0) == 1 ? "" : "s").")
         }
-    }
-
-    static func number(_ value: Double) -> String {
-        value == value.rounded() ? String(Int(value)) : String(value)
     }
 }
 

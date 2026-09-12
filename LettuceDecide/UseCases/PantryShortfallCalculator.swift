@@ -7,6 +7,10 @@ import Foundation
 ///
 /// Rules (same "unit-match-only, never guess a conversion" stance as
 /// `UpdateInventoryAfterCookingUseCase`):
+/// - a required ingredient whose quantity is flagged uncertain (see
+///   `RecipeIngredient.quantityIsUncertain`) is never compared against the pantry at all —
+///   there's no trustworthy number to compare with — and goes straight onto the shopping
+///   list as its own honest "amount unclear" line;
 /// - an ingredient the pantry doesn't have at all → the full required amount is needed;
 /// - an ingredient the pantry has, but in a different unit → left alone, not treated as
 ///   missing (the cook has it; the app just can't compare grams to cups);
@@ -28,6 +32,11 @@ enum PantryShortfallCalculator {
         var toBuy: [ShoppingListItem] = []
 
         for required in recipe.requiredIngredients {
+            if required.quantityIsUncertain {
+                toBuy.append(shoppingItem(for: required, quantity: required.requiredQuantity, now: now))
+                continue
+            }
+
             let key = required.name.normalizedIngredientName
             guard let index = pantry.firstIndex(where: {
                 $0.ingredientName.normalizedIngredientName == key
@@ -68,7 +77,9 @@ enum PantryShortfallCalculator {
             ingredientName: required.name,
             requiredQuantity: quantity,
             unit: required.unit,
-            dateAdded: now
+            dateAdded: now,
+            ingredientId: required.id,
+            quantityIsUncertain: required.quantityIsUncertain
         )
     }
 }

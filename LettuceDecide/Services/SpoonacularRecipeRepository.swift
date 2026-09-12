@@ -107,11 +107,21 @@ private struct SpoonacularIngredient: Decodable {
     let unit: String?
 
     var asRecipeIngredient: RecipeIngredient {
-        RecipeIngredient(
+        // Diagnosed live: Spoonacular sometimes puts "servings" (or "serving") in the unit
+        // field of a single ingredient line — e.g. "4 servings" of green onion on one recipe.
+        // That's not a piece count; `amount` there means something else entirely (often a
+        // per-serving ratio), and treating it as "4 pieces" produces a wildly inflated,
+        // confident-looking wrong number once several recipes' worth get summed on a
+        // shopping list. `IngredientUnit(spoonacularUnit:)` still maps it to `.pieces` for
+        // structural reasons (every RecipeIngredient needs a concrete unit), but this flag is
+        // what stops that number from being trusted downstream.
+        let rawUnit = (unit ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return RecipeIngredient(
             id: id ?? abs((nameClean ?? name ?? "").hashValue),
             name: nameClean ?? name ?? "ingredient",
             requiredQuantity: amount ?? 0,
-            unit: IngredientUnit(spoonacularUnit: unit ?? "") ?? .pieces
+            unit: IngredientUnit(spoonacularUnit: unit ?? "") ?? .pieces,
+            quantityIsUncertain: rawUnit == "serving" || rawUnit == "servings"
         )
     }
 }

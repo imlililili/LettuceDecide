@@ -101,6 +101,51 @@ struct SpoonacularDecodingEdgeCaseTests {
         #expect(ingredients.first { $0.name == "salt" }?.unit == .teaspoons)
     }
 
+    /// Regression for the diagnosed "onion 200 pcs" bug: Spoonacular sometimes puts
+    /// "servings"/"serving" in an ingredient's unit field (e.g. "4 servings" of green onion
+    /// on one recipe line) — not a real piece count. Confirmed live against the real API.
+    /// The amount must be flagged uncertain, not silently trusted as `.pieces`.
+    @Test func servingsUnitFlagsTheQuantityAsUncertain() throws {
+        let json = """
+        { "results": [ { "id": 1, "title": "T", "extendedIngredients": [
+            { "id": 20, "name": "green onions", "amount": 4, "unit": "servings" },
+            { "id": 21, "name": "onion", "amount": 12, "unit": "serving" },
+            { "id": 22, "name": "flour", "amount": 200, "unit": "grams" }
+        ] } ] }
+        """.data(using: .utf8)!
+
+        let ingredients = try #require(
+            try SpoonacularRecipeRepository.parseCandidates(from: json).first?.recipe.requiredIngredients
+        )
+
+        let greenOnions = try #require(ingredients.first { $0.name == "green onions" })
+        #expect(greenOnions.quantityIsUncertain)
+        #expect(greenOnions.unit == .pieces) // still structurally .pieces, just flagged untrustworthy
+
+        let onion = try #require(ingredients.first { $0.name == "onion" })
+        #expect(onion.quantityIsUncertain) // singular "serving" too
+
+        let flour = try #require(ingredients.first { $0.name == "flour" })
+        #expect(!flour.quantityIsUncertain)
+    }
+
+    /// "c" is a common Spoonacular abbreviation for cups (confirmed live: 9 occurrences in a
+    /// single 100-recipe sample) that wasn't in the recognised set — it fell back to
+    /// `.pieces`, quietly miscategorising a volume amount as a piece count.
+    @Test func cAbbreviationIsRecognisedAsCups() throws {
+        let json = """
+        { "results": [ { "id": 1, "title": "T", "extendedIngredients": [
+            { "id": 30, "name": "caramelized onions", "amount": 0.667, "unit": "c" }
+        ] } ] }
+        """.data(using: .utf8)!
+
+        let ingredient = try #require(
+            try SpoonacularRecipeRepository.parseCandidates(from: json).first?.recipe.requiredIngredients.first
+        )
+        #expect(ingredient.unit == .cups)
+        #expect(!ingredient.quantityIsUncertain)
+    }
+
     @Test func emptyResultsListDecodesToNoCandidates() throws {
         let json = #"{ "results": [] }"#.data(using: .utf8)!
         #expect(try SpoonacularRecipeRepository.parseCandidates(from: json).isEmpty)
