@@ -123,4 +123,24 @@ enum IngredientUnit: String, CaseIterable, Identifiable, Codable {
             return (((quantity * 100).rounded()) / 100, unit)
         }
     }
+
+    /// Normalises a quantity for storage in the pantry (`ManagePantryIngredientUseCase` calls
+    /// this on every write): a volume-group unit — `millilitres`/`cups`/`tablespoons`/
+    /// `teaspoons` — becomes millilitres, since converting between them is a fixed,
+    /// ingredient-independent ratio with nothing to guess (see `VolumeConversion`). `grams`
+    /// and `pieces` come back unchanged — converting *those* would need an ingredient's
+    /// density or average item size, which this app does not model, the same "don't guess"
+    /// boundary as everywhere else.
+    ///
+    /// This is why a pantry line only ever exists in one of three units — `grams`, `pieces`,
+    /// or `millilitres` — no matter which unit the cook picked when typing it in, or which
+    /// unit a recipe originally called for: cups/tablespoons/teaspoons are too imprecise a
+    /// way to track inventory long-term (a "cup" of a chopped ingredient packs differently
+    /// each time), so they exist only as an input convenience, never as stored state.
+    static func normalizedForPantryStorage(quantity: Double, unit: IngredientUnit) -> (quantity: Double, unit: IngredientUnit) {
+        guard let millilitres = VolumeConversion.millilitres(for: quantity, unit: unit) else {
+            return (quantity, unit)
+        }
+        return (((millilitres * 100).rounded()) / 100, .millilitres)
+    }
 }

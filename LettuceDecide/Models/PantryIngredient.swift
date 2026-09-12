@@ -61,11 +61,17 @@ struct PantryIngredient: Identifiable, Codable, Equatable {
     /// `ShoppingListItem.isSamePurchase(as:)`: a matching known `ingredientId` OR a matching
     /// normalised name is sufficient (neither is reliable alone — see that method's docs for
     /// the live-diagnosed reason), **and** the same unit and storage location, since a fridge
-    /// stash and a freezer stash of the same ingredient are genuinely separate lines. Unlike
-    /// the shopping list, this does not treat different-but-convertible units (e.g. tbsp vs
-    /// cups) as the same stock — pantry inventory numbers feed real deductions
-    /// (`UpdateInventoryAfterCookingUseCase`), so merging across units here stays exact-match
-    /// only, same as before.
+    /// stash and a freezer stash of the same ingredient are genuinely separate lines. This
+    /// compares whatever units the two lines actually hold — it does not itself convert
+    /// cups/tbsp/tsp into millilitres. In practice that never causes a spurious split, because
+    /// every write that reaches here has already gone through
+    /// `IngredientUnit.normalizedForPantryStorage` (`ManagePantryIngredientUseCase` calls it
+    /// before ever constructing or comparing a `PantryIngredient`), so a pantry line's `unit`
+    /// is always one of `grams`/`pieces`/`millilitres` to begin with — never cups/tbsp/tsp.
+    /// Grams and pieces still never merge with millilitres or each other here: that
+    /// conversion needs an ingredient's density or average item size, which this app does not
+    /// model, and pantry inventory numbers feed real deductions
+    /// (`UpdateInventoryAfterCookingUseCase`), so this stays exact-match only.
     func isSameStock(as other: PantryIngredient) -> Bool {
         guard unit == other.unit, storageLocation == other.storageLocation else { return false }
         if let lhsID = ingredientId, let rhsID = other.ingredientId, lhsID == rhsID {

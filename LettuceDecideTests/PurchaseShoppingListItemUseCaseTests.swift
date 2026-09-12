@@ -53,6 +53,34 @@ struct PurchaseShoppingListItemUseCaseTests {
         #expect(Set(pantry.map(\.unit)) == [.grams, .pieces])
     }
 
+    /// The user's explicit new rule: a volume-class purchase always lands in the pantry as
+    /// millilitres, unconditionally — not only once it collides with an existing millilitres
+    /// line. cups/tablespoons/teaspoons are too imprecise to track long-term inventory in.
+    @Test func buyingAVolumeItemStoresItAsMillilitresEvenWithNoExistingPantryLine() throws {
+        let item = ShoppingListItem(ingredientName: "olive oil", requiredQuantity: 2, unit: .cups, ingredientId: 4053)
+        let (useCase, _, pantryStore) = makeUseCase(shoppingList: [item])
+
+        try useCase.execute(item)
+
+        let pantryLine = try #require(pantryStore.load().first)
+        #expect(pantryLine.unit == .millilitres)
+        #expect(pantryLine.quantity == 480) // 2 cups -> 480ml
+    }
+
+    @Test func buyingAVolumeItemMergesWithAnExistingMillilitresLineAfterNormalising() throws {
+        let existing = PantryIngredient(
+            ingredientName: "olive oil", quantity: 100, unit: .millilitres, storageLocation: .fridge, ingredientId: 4053
+        )
+        let item = ShoppingListItem(ingredientName: "olive oil", requiredQuantity: 1, unit: .tablespoons, ingredientId: 4053)
+        let (useCase, _, pantryStore) = makeUseCase(shoppingList: [item], pantry: [existing])
+
+        try useCase.execute(item, storageLocation: .fridge)
+
+        let pantry = pantryStore.load()
+        #expect(pantry.count == 1)
+        #expect(pantry.first?.quantity == 115) // 100ml already there + 15ml (1 tbsp)
+    }
+
     @Test func doesNotRemoveFromTheShoppingListWhenThePantryWriteFails() {
         // Confirming with an explicit zero quantity fails ManagePantryIngredientUseCase's own
         // validation — the item must stay on the list rather than vanish with nothing to show

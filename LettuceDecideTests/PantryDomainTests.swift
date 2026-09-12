@@ -186,3 +186,28 @@ struct VolumeConversionTests {
         #expect(quantity == 6.67)
     }
 }
+
+struct NormalizedForPantryStorageTests {
+    @Test func convertsEachVolumeUnitToMillilitres() {
+        #expect(IngredientUnit.normalizedForPantryStorage(quantity: 2, unit: .cups).quantity == 480)
+        #expect(IngredientUnit.normalizedForPantryStorage(quantity: 2, unit: .cups).unit == .millilitres)
+        #expect(IngredientUnit.normalizedForPantryStorage(quantity: 3, unit: .tablespoons).quantity == 45)
+        #expect(IngredientUnit.normalizedForPantryStorage(quantity: 4, unit: .teaspoons).quantity == 20)
+    }
+
+    @Test func millilitresPassThroughUnchanged() {
+        let result = IngredientUnit.normalizedForPantryStorage(quantity: 300, unit: .millilitres)
+        #expect(result.quantity == 300)
+        #expect(result.unit == .millilitres)
+    }
+
+    @Test func leavesWeightAndCountUnchanged() {
+        let grams = IngredientUnit.normalizedForPantryStorage(quantity: 200, unit: .grams)
+        #expect(grams.quantity == 200)
+        #expect(grams.unit == .grams)
+
+        let pieces = IngredientUnit.normalizedForPantryStorage(quantity: 3, unit: .pieces)
+        #expect(pieces.quantity == 3)
+        #expect(pieces.unit == .pieces)
+    }
+}
