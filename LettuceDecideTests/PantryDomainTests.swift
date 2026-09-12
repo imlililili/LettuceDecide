@@ -85,4 +85,57 @@ struct IngredientUnitTests {
     @Test func returnsNilForUnknownUnit() {
         #expect(IngredientUnit(spoonacularUnit: "clove") == nil)
     }
+
+    @Test func recognisesTheBareCAbbreviationForCups() {
+        #expect(IngredientUnit(spoonacularUnit: "c") == .cups)
+        #expect(IngredientUnit(spoonacularUnit: "C") == .cups)
+    }
+
+    @Test func measurementGroupsSeparateWeightVolumeAndCount() {
+        #expect(IngredientUnit.grams.measurementGroup == .weight)
+        #expect(IngredientUnit.pieces.measurementGroup == .count)
+        #expect(IngredientUnit.millilitres.measurementGroup == .volume)
+        #expect(IngredientUnit.cups.measurementGroup == .volume)
+        #expect(IngredientUnit.tablespoons.measurementGroup == .volume)
+        #expect(IngredientUnit.teaspoons.measurementGroup == .volume)
+    }
+}
+
+struct VolumeConversionTests {
+    @Test func convertsEachVolumeUnitToMillilitres() {
+        #expect(IngredientUnit.VolumeConversion.millilitres(for: 2, unit: .millilitres) == 2)
+        #expect(IngredientUnit.VolumeConversion.millilitres(for: 1, unit: .cups) == 240)
+        #expect(IngredientUnit.VolumeConversion.millilitres(for: 1, unit: .tablespoons) == 15)
+        #expect(IngredientUnit.VolumeConversion.millilitres(for: 1, unit: .teaspoons) == 5)
+    }
+
+    @Test func returnsNilForNonVolumeUnits() {
+        #expect(IngredientUnit.VolumeConversion.millilitres(for: 1, unit: .grams) == nil)
+        #expect(IngredientUnit.VolumeConversion.millilitres(for: 1, unit: .pieces) == nil)
+    }
+
+    @Test func displayFormPicksCupsOnceThereIsAtLeastAFullCup() {
+        let (quantity, unit) = IngredientUnit.VolumeConversion.displayForm(millilitres: 480)
+        #expect(unit == .cups)
+        #expect(quantity == 2)
+    }
+
+    @Test func displayFormPicksTablespoonsBelowACupButAtLeastATablespoon() {
+        let (quantity, unit) = IngredientUnit.VolumeConversion.displayForm(millilitres: 30)
+        #expect(unit == .tablespoons)
+        #expect(quantity == 2)
+    }
+
+    @Test func displayFormPicksTeaspoonsBelowATablespoon() {
+        let (quantity, unit) = IngredientUnit.VolumeConversion.displayForm(millilitres: 10)
+        #expect(unit == .teaspoons)
+        #expect(quantity == 2)
+    }
+
+    @Test func displayFormRoundsToTwoDecimalPlaces() {
+        // 100ml in tablespoons = 6.6666... -> must not print as 6.66666667.
+        let (quantity, unit) = IngredientUnit.VolumeConversion.displayForm(millilitres: 100)
+        #expect(unit == .tablespoons)
+        #expect(quantity == 6.67)
+    }
 }

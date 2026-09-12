@@ -30,7 +30,9 @@ struct AddMissingIngredientsToShoppingListUseCase {
                 ingredientName: $0.name,
                 requiredQuantity: $0.requiredQuantity,
                 unit: $0.unit,
-                dateAdded: now
+                dateAdded: now,
+                ingredientId: $0.id,
+                quantityIsUncertain: $0.quantityIsUncertain
             )
         })
     }

@@ -47,12 +47,7 @@ struct HomeView: View {
                     if !viewModel.shoppingList.isEmpty {
                         Section("Shopping list") {
                             ForEach(viewModel.shoppingList) { item in
-                                HStack {
-                                    Text(item.ingredientName)
-                                    Spacer()
-                                    Text("\(Self.number(item.requiredQuantity)) \(item.unit.displayName)")
-                                        .foregroundStyle(.secondary)
-                                }
+                                ShoppingListItemRow(item: item)
                             }
                         }
                     }
@@ -60,10 +55,6 @@ struct HomeView: View {
             }
         }
         .navigationTitle("Home")
-    }
-
-    static func number(_ value: Double) -> String {
-        value == value.rounded() ? String(Int(value)) : String(value)
     }
 }
 

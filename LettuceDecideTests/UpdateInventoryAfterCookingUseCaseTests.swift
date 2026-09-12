@@ -55,6 +55,27 @@ struct UpdateInventoryAfterCookingUseCaseTests {
         #expect(store.load().first?.quantity == 500)
     }
 
+    /// A real-inventory-corruption risk found while diagnosing the "onion 200 pcs" shopping
+    /// list bug: the same untrustworthy "servings" quantity that inflated the shopping list
+    /// could also deduct a fabricated amount of *real* pantry stock on Mark as Cooked. An
+    /// uncertain quantity must route to manual review, never be deducted — reusing the exact
+    /// mechanism `.needsManualReview` already has for a cross-unit mismatch.
+    @Test func updateInventory_skipsAndReportsIngredientsWithAnUncertainQuantity() throws {
+        let onion = PantryIngredient(ingredientName: "onion", quantity: 3, unit: .pieces, storageLocation: .pantry)
+        let store = InMemoryPantryStore(initial: [onion])
+        let cooked = recipe([
+            RecipeIngredient(id: 1, name: "onion", requiredQuantity: 12, unit: .pieces, quantityIsUncertain: true)
+        ])
+
+        let outcome = try UpdateInventoryAfterCookingUseCase(store: store)
+            .execute(result(recipe: cooked, matched: [onion]))
+
+        #expect(outcome.deducted.isEmpty)
+        #expect(outcome.needsManualReview.map(\.name) == ["onion"])
+        // The real pantry is untouched — nothing was deducted based on the bad number.
+        #expect(store.load().first?.quantity == 3)
+    }
+
     @Test func updateInventory_removesLineWhenItReachesExactlyZero() throws {
         let eggs = PantryIngredient(ingredientName: "eggs", quantity: 3, unit: .pieces, storageLocation: .fridge)
         let store = InMemoryPantryStore(initial: [eggs])

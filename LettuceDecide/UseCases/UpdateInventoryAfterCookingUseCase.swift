@@ -40,6 +40,10 @@ struct InventoryUpdateOutcome: Equatable {
 ///   `ingredientNotFound` (the whole update is abandoned, nothing is saved);
 /// - if the recipe's unit for an ingredient differs from the unit the pantry stores it in,
 ///   that ingredient is skipped and reported in `needsManualReview` — no conversion;
+/// - if the recipe's own quantity for an ingredient is flagged uncertain (see
+///   `RecipeIngredient.quantityIsUncertain`), it is likewise skipped into
+///   `needsManualReview` rather than deducted — a fabricated number must never take real
+///   stock out of the pantry;
 /// - if a deduction would take a line below zero it throws `insufficientQuantity` and
 ///   nothing is saved;
 /// - a line that reaches exactly zero is removed.
@@ -59,6 +63,10 @@ struct UpdateInventoryAfterCookingUseCase {
             let line = pantry[index]
 
             guard let required = requiredIngredient(for: line, in: result.recipe) else {
+                continue
+            }
+            guard !required.quantityIsUncertain else {
+                needsReview.append(required)
                 continue
             }
             guard required.unit == line.unit else {

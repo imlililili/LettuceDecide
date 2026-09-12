@@ -86,3 +86,22 @@ struct RecipeCodableToleranceTests {
         #expect(recipe.containsAllergens == nil)
     }
 }
+
+struct RecipeIngredientCodableToleranceTests {
+    /// A cached recipe search written before `quantityIsUncertain` existed must still decode
+    /// — missing means "not flagged", not a cache-read failure.
+    @Test func decodesLegacyJSONWithoutQuantityIsUncertain() throws {
+        let legacy = """
+        { "id": 20081, "name": "flour", "requiredQuantity": 200, "unit": "grams" }
+        """.data(using: .utf8)!
+        let ingredient = try JSONDecoder().decode(RecipeIngredient.self, from: legacy)
+        #expect(ingredient.name == "flour")
+        #expect(ingredient.quantityIsUncertain == false)
+    }
+
+    @Test func roundTripsWithQuantityIsUncertainSet() throws {
+        let ingredient = RecipeIngredient(id: 1, name: "green onions", requiredQuantity: 4, unit: .pieces, quantityIsUncertain: true)
+        let data = try JSONEncoder().encode(ingredient)
+        #expect(try JSONDecoder().decode(RecipeIngredient.self, from: data) == ingredient)
+    }
+}

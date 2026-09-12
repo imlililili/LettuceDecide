@@ -81,6 +81,29 @@ struct PantryShortfallCalculatorTests {
         #expect(pantry.first?.quantity == 2) // untouched, not deducted, not guessed at
     }
 
+    /// Regression for the diagnosed "onion 200 pcs" bug: an ingredient whose quantity is
+    /// flagged uncertain (Spoonacular's "servings" unit) must never be compared against the
+    /// pantry — not even when the pantry happens to have a same-named `.pieces` line — since
+    /// there's no trustworthy number to compare with. It goes straight onto the shopping list
+    /// as its own honest, uncertain line.
+    @Test func anUncertainQuantityBypassesThePantryEntirelyAndIsFlaggedOnTheShoppingList() {
+        var pantry = [PantryIngredient(ingredientName: "onion", quantity: 3, unit: .pieces, storageLocation: .pantry)]
+
+        let toBuy = PantryShortfallCalculator.stillNeeded(
+            for: recipe(1, ingredients: [
+                RecipeIngredient(id: 1, name: "onion", requiredQuantity: 12, unit: .pieces, quantityIsUncertain: true)
+            ]),
+            from: &pantry,
+            now: now
+        )
+
+        // The pantry's real onion stock is untouched — an uncertain amount never deducts.
+        #expect(pantry.first?.quantity == 3)
+        #expect(toBuy.count == 1)
+        #expect(toBuy.first?.quantityIsUncertain == true)
+        #expect(toBuy.first?.ingredientName == "onion")
+    }
+
     @Test func threadingTheSameVirtualPantryAcrossTwoRecipesSplitsTheSharedStock() {
         var pantry = [PantryIngredient(ingredientName: "chickpeas", quantity: 400, unit: .grams, storageLocation: .pantry)]
 
