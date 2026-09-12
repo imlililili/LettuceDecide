@@ -116,9 +116,22 @@ private struct SpoonacularIngredient: Decodable {
         // structural reasons (every RecipeIngredient needs a concrete unit), but this flag is
         // what stops that number from being trusted downstream.
         let rawUnit = (unit ?? "").trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let resolvedName = nameClean ?? name ?? "ingredient"
+        let resolvedId = id ?? abs(resolvedName.hashValue)
+
+        // Diagnosed live: "kg"/"kilogram(s)" isn't a string IngredientUnit(spoonacularUnit:)
+        // recognises, and without rescaling the amount it fell through to `.pieces`
+        // unchanged — a live sample reproduced this exactly for a "200 gr" (grams
+        // abbreviation, now recognised directly below) potato line becoming "200 pieces" on
+        // the shopping list. Kilograms need actual rescaling (×1000), which a plain unit-string
+        // mapping can't express, hence the dedicated helper.
+        if let rescaled = IngredientUnit.rescaledAmount(amount ?? 0, rawUnit: rawUnit) {
+            return RecipeIngredient(id: resolvedId, name: resolvedName, requiredQuantity: rescaled.amount, unit: rescaled.unit)
+        }
+
         return RecipeIngredient(
-            id: id ?? abs((nameClean ?? name ?? "").hashValue),
-            name: nameClean ?? name ?? "ingredient",
+            id: resolvedId,
+            name: resolvedName,
             requiredQuantity: amount ?? 0,
             unit: IngredientUnit(spoonacularUnit: unit ?? "") ?? .pieces,
             quantityIsUncertain: rawUnit == "serving" || rawUnit == "servings"

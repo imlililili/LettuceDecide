@@ -33,12 +33,30 @@ enum IngredientUnit: String, CaseIterable, Identifiable, Codable {
     /// quantity as not automatically comparable (see `UpdateInventoryAfterCookingUseCase`).
     init?(spoonacularUnit raw: String) {
         switch raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
-        case "g", "gram", "grams": self = .grams
+        case "g", "gram", "grams", "gr": self = .grams
         case "ml", "milliliter", "milliliters", "millilitre", "millilitres": self = .millilitres
         case "", "piece", "pieces", "x", "serving", "servings": self = .pieces
         case "cup", "cups", "c": self = .cups
         case "tb", "tbs", "tbsp", "tablespoon", "tablespoons": self = .tablespoons
         case "tsp", "teaspoon", "teaspoons": self = .teaspoons
+        default: return nil
+        }
+    }
+
+    /// Some raw Spoonacular unit strings are a fixed multiple of a unit already in the MVP
+    /// set rather than that unit's own string — kilograms are exactly 1000 grams, an
+    /// undisputed SI ratio, not a guess. `init(spoonacularUnit:)` alone can't express that (it
+    /// only maps a string to a case, with the amount left untouched), so without this a "0.5
+    /// kg" or "200 gr" ingredient line fell through to `.pieces` with its amount unchanged —
+    /// live-diagnosed as the cause of implausible shopping-list quantities like "potatoes 200
+    /// pcs" (the raw line really was 200, just 200 **grams**, not 200 potatoes).
+    ///
+    /// - Returns: the amount rescaled into the matching MVP unit, or `nil` if `rawUnit` isn't
+    ///   one of these fixed-multiple cases (the ordinary `init(spoonacularUnit:)` path handles
+    ///   everything else, "gr" included — that one *is* already gram-scaled, just abbreviated).
+    static func rescaledAmount(_ rawAmount: Double, rawUnit: String) -> (amount: Double, unit: IngredientUnit)? {
+        switch rawUnit.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "kg", "kilogram", "kilograms": return (rawAmount * 1000, .grams)
         default: return nil
         }
     }

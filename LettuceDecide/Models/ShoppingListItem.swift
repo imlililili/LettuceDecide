@@ -7,13 +7,21 @@ import Foundation
 /// shop.
 ///
 /// Business rule (dedupe): two lines describe the same purchase — and are merged into one,
-/// their quantities combined — when they identify the same ingredient **and** their units
-/// belong to the same measurement family (`IngredientUnit.MeasurementGroup`). `mergeKey` is
-/// that identity:
-/// - **Ingredient identity** prefers Spoonacular's own ingredient `id` (`ingredientId`) over
-///   the ingredient name — the same ingredient is worded differently across recipes ("garlic"
-///   vs "garlic cloves"), and a stable id survives that where a name string can't. Falls back
-///   to the normalised name only when no id is known.
+/// their quantities combined — when `isSamePurchase(as:)` says they identify the same
+/// ingredient **and** their units belong to the same measurement family
+/// (`IngredientUnit.MeasurementGroup`):
+/// - **Ingredient identity** matches on Spoonacular's own ingredient `id` (`ingredientId`) OR
+///   the normalised ingredient name — either signal is enough on its own, deliberately not
+///   "id when present, else name". Neither signal is reliable alone: Spoonacular sometimes
+///   assigns two *different* ids to text it displays identically (live-diagnosed: the literal
+///   string "olive oil" carries id 4053 in some recipes and id 1034053 — its "extra virgin"
+///   variant — in others), so an id-only or id-priority match would leave two lines reading
+///   "olive oil" sitting unmerged on the list. Matching by name whenever it's identical, in
+///   addition to id, catches that. (The reverse case — the same food worded differently, e.g.
+///   "garlic" vs "garlic clove" — turns out to carry genuinely different ids too, 11215 vs
+///   10211215; this class of "same food, different words *and* different id" is a harder,
+///   separate normalisation problem this method does not attempt, since guessing which
+///   differently-worded lines are "close enough" risks merging things that are not.)
 /// - **Measurement family**, not the literal unit: `millilitres`/`cups`/`tablespoons`/
 ///   `teaspoons` are all volume and freely convert into one another with a fixed,
 ///   ingredient-independent ratio (see `IngredientUnit.VolumeConversion`), so they merge into
@@ -68,29 +76,28 @@ struct ShoppingListItem: Identifiable, Codable, Equatable {
         quantityIsUncertain = try c.decodeIfPresent(Bool.self, forKey: .quantityIsUncertain) ?? false
     }
 
-    /// Identity for the dedupe rule: see the merge-identity and measurement-family rules
-    /// above. Not the same as `id`, which is per-record.
-    var mergeKey: MergeKey {
-        let identity: MergeKey.Identity = ingredientId.map(MergeKey.Identity.ingredientId)
-            ?? .normalizedName(ingredientName.normalizedIngredientName)
-        return MergeKey(identity: identity, measurementGroup: unit.measurementGroup)
-    }
-
-    struct MergeKey: Hashable {
-        let identity: Identity
-        let measurementGroup: IngredientUnit.MeasurementGroup
-
-        enum Identity: Hashable {
-            case ingredientId(Int)
-            case normalizedName(String)
+    /// Whether `self` and `other` describe the same purchase — see the dedupe rule above.
+    /// Two independent, either-is-enough signals: a matching known `ingredientId`, or a
+    /// matching normalised name. Also requires the same `measurementGroup`, so e.g. a gram
+    /// line and a piece line for the same ingredient still never merge.
+    func isSamePurchase(as other: ShoppingListItem) -> Bool {
+        guard unit.measurementGroup == other.unit.measurementGroup else { return false }
+        if let lhsID = ingredientId, let rhsID = other.ingredientId, lhsID == rhsID {
+            return true
         }
+        return ingredientName.normalizedIngredientName == other.ingredientName.normalizedIngredientName
     }
 }
 
 extension Array where Element == ShoppingListItem {
-    /// Adds `item` under the dedupe rule (see `ShoppingListItem.mergeKey`): an existing line
-    /// with the same identity and measurement family gets combined with it; anything else is
-    /// appended as a new line.
+    /// Adds `item` under the dedupe rule (see `ShoppingListItem.isSamePurchase(as:)`): an
+    /// existing line describing the same purchase gets combined with it; anything else is
+    /// appended as a new line. Called every time an ingredient is added — from a single
+    /// recipe's missing ingredients, a whole week's aggregated shortfall, or one more day
+    /// confirmed after several others — always against the **current persisted list**
+    /// (`AddMissingIngredientsToShoppingListUseCase` reloads it fresh before merging), so an
+    /// ingredient confirmed on day 3 correctly finds and combines with the same ingredient
+    /// confirmed on day 1, not just other lines added in the same call.
     ///
     /// Combining two lines:
     /// - if either side's amount is uncertain, the merged line is marked uncertain too and
@@ -111,7 +118,7 @@ extension Array where Element == ShoppingListItem {
     /// Shared by `WeeklyPlanBuilder` (aggregating a week's shortfalls) and
     /// `AddMissingIngredientsToShoppingListUseCase` (merging into the saved list).
     mutating func addMerging(_ item: ShoppingListItem) {
-        guard let index = firstIndex(where: { $0.mergeKey == item.mergeKey }) else {
+        guard let index = firstIndex(where: { $0.isSamePurchase(as: item) }) else {
             append(item)
             return
         }
