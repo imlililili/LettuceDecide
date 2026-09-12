@@ -48,16 +48,36 @@ struct IngredientNameNormalizationTests {
 }
 
 struct PantryIngredientTests {
-    @Test func mergeKeyIgnoresQuantityCaseAndPlural() {
+    @Test func isSameStockIgnoresQuantityCaseAndPluralWhenIdsAreNil() {
         let a = PantryIngredient(ingredientName: "Tomatoes", quantity: 2, unit: .pieces, storageLocation: .fridge)
         let b = PantryIngredient(ingredientName: "tomato", quantity: 99, unit: .pieces, storageLocation: .fridge)
-        #expect(a.mergeKey == b.mergeKey)
+        #expect(a.isSameStock(as: b))
     }
 
-    @Test func mergeKeyDistinguishesLocation() {
+    @Test func isSameStockDistinguishesLocation() {
         let a = PantryIngredient(ingredientName: "peas", quantity: 1, unit: .grams, storageLocation: .fridge)
         let b = PantryIngredient(ingredientName: "peas", quantity: 1, unit: .grams, storageLocation: .freezer)
-        #expect(a.mergeKey != b.mergeKey)
+        #expect(!a.isSameStock(as: b))
+    }
+
+    @Test func isSameStockDistinguishesUnit() {
+        let a = PantryIngredient(ingredientName: "flour", quantity: 200, unit: .grams, storageLocation: .pantry)
+        let b = PantryIngredient(ingredientName: "flour", quantity: 2, unit: .cups, storageLocation: .pantry)
+        #expect(!a.isSameStock(as: b)) // unlike the shopping list, pantry never converts units
+    }
+
+    /// Same rule shape as `ShoppingListItem.isSamePurchase(as:)`: matching on id OR name,
+    /// either sufficient — not "id when present, else name" — so a pantry line originating
+    /// from a purchase (carrying an id) still recognises a hand-typed line with no id at all,
+    /// and a known id present on both sides matches even if the names happen to differ.
+    @Test func isSameStockMatchesOnEitherIdOrName() {
+        let byName = PantryIngredient(ingredientName: "onion", quantity: 1, unit: .pieces, storageLocation: .pantry, ingredientId: nil)
+        let byNameAgain = PantryIngredient(ingredientName: "onion", quantity: 2, unit: .pieces, storageLocation: .pantry, ingredientId: 11282)
+        #expect(byName.isSameStock(as: byNameAgain)) // known id still matches a nil-id line by name
+
+        let spring = PantryIngredient(ingredientName: "spring onion", quantity: 1, unit: .pieces, storageLocation: .pantry, ingredientId: 11291)
+        let green = PantryIngredient(ingredientName: "green onions", quantity: 1, unit: .pieces, storageLocation: .pantry, ingredientId: 11291)
+        #expect(spring.isSameStock(as: green)) // same id, different wording
     }
 
     @Test func roundTripsThroughJSON() throws {

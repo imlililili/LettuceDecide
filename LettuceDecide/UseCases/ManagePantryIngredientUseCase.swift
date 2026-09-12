@@ -43,7 +43,10 @@ struct ManagePantryIngredientUseCase {
     let store: PantryStoring
 
     enum Action: Equatable {
-        case add(name: String, quantity: Double, unit: IngredientUnit, storageLocation: StorageLocation, expiryDate: Date?)
+        case add(
+            name: String, quantity: Double, unit: IngredientUnit, storageLocation: StorageLocation,
+            expiryDate: Date?, ingredientId: Int? = nil
+        )
         case update(id: UUID, quantity: Double, unit: IngredientUnit, storageLocation: StorageLocation, expiryDate: Date?)
         case remove(id: UUID)
     }
@@ -54,7 +57,7 @@ struct ManagePantryIngredientUseCase {
         var pantry = store.load()
 
         switch action {
-        case let .add(name, quantity, unit, storageLocation, expiryDate):
+        case let .add(name, quantity, unit, storageLocation, expiryDate, ingredientId):
             try validate(quantity: quantity, expiryDate: expiryDate, now: now)
             let addition = PantryIngredient(
                 ingredientName: name.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -62,9 +65,10 @@ struct ManagePantryIngredientUseCase {
                 unit: unit,
                 storageLocation: storageLocation,
                 expiryDate: expiryDate,
-                dateAdded: now
+                dateAdded: now,
+                ingredientId: ingredientId
             )
-            if let index = pantry.firstIndex(where: { $0.mergeKey == addition.mergeKey }) {
+            if let index = pantry.firstIndex(where: { $0.isSameStock(as: addition) }) {
                 pantry[index].quantity += quantity
                 pantry[index].expiryDate = earlierExpiry(pantry[index].expiryDate, expiryDate)
             } else {

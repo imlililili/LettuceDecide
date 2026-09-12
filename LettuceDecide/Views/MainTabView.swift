@@ -99,7 +99,11 @@ struct MainTabView: View {
     let confirmedMealStore = InMemoryConfirmedMealStore()
     let shoppingListStore = InMemoryShoppingListStore()
     return MainTabView(
-        homeViewModel: HomeViewModel(confirmedMealStore: confirmedMealStore, shoppingListStore: shoppingListStore),
+        homeViewModel: HomeViewModel(
+            confirmedMealStore: confirmedMealStore,
+            shoppingListStore: shoppingListStore,
+            pantryStore: pantryStore
+        ),
         pantryViewModel: PantryViewModel(store: pantryStore),
         weeklyPlannerViewModel: WeeklyPlannerViewModel(
             recordBusyness: RecordBusynessUseCase(store: InMemoryScheduleStore()),

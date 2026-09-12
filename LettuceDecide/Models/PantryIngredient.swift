@@ -8,9 +8,8 @@ import Foundation
 /// Business rules:
 /// - `quantity` is always greater than zero. A line with zero or negative quantity is not
 ///   inventory, it is a data error, and `ManagePantryIngredientUseCase` rejects it.
-/// - Two lines that share the same normalised name, unit, and storage location describe the
-///   same physical stock and must be merged into one line (their quantities added), never
-///   stored side by side. `mergeKey` is that identity.
+/// - Two lines that describe the same physical stock — see `isSameStock(as:)` — must be
+///   merged into one line (their quantities added), never stored side by side.
 struct PantryIngredient: Identifiable, Codable, Equatable {
     let id: UUID
     let ingredientName: String
@@ -19,6 +18,10 @@ struct PantryIngredient: Identifiable, Codable, Equatable {
     var storageLocation: StorageLocation
     var expiryDate: Date?
     let dateAdded: Date
+    /// Spoonacular's ingredient id, when the line originated from a recipe (e.g. bought off
+    /// the shopping list via `PurchaseShoppingListItemUseCase`) rather than typed in by hand.
+    /// See `isSameStock(as:)` for how this is used.
+    let ingredientId: Int?
 
     init(
         id: UUID = UUID(),
@@ -27,7 +30,8 @@ struct PantryIngredient: Identifiable, Codable, Equatable {
         unit: IngredientUnit,
         storageLocation: StorageLocation,
         expiryDate: Date? = nil,
-        dateAdded: Date = Date()
+        dateAdded: Date = Date(),
+        ingredientId: Int? = nil
     ) {
         self.id = id
         self.ingredientName = ingredientName
@@ -36,27 +40,43 @@ struct PantryIngredient: Identifiable, Codable, Equatable {
         self.storageLocation = storageLocation
         self.expiryDate = expiryDate
         self.dateAdded = dateAdded
+        self.ingredientId = ingredientId
     }
 
-    /// Identity for the "same physical stock" merge rule: normalised name + unit + location.
-    /// Not the same as `id`, which is per-record.
-    var mergeKey: MergeKey {
-        MergeKey(
-            normalizedName: ingredientName.normalizedIngredientName,
-            unit: unit,
-            storageLocation: storageLocation
-        )
+    /// Tolerant of JSON written before `ingredientId` existed (the persisted pantry file) —
+    /// missing means "typed in by hand / unknown", not a decode failure.
+    init(from decoder: any Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        ingredientName = try c.decode(String.self, forKey: .ingredientName)
+        quantity = try c.decode(Double.self, forKey: .quantity)
+        unit = try c.decode(IngredientUnit.self, forKey: .unit)
+        storageLocation = try c.decode(StorageLocation.self, forKey: .storageLocation)
+        expiryDate = try c.decodeIfPresent(Date.self, forKey: .expiryDate)
+        dateAdded = try c.decode(Date.self, forKey: .dateAdded)
+        ingredientId = try c.decodeIfPresent(Int.self, forKey: .ingredientId)
+    }
+
+    /// Whether `self` and `other` describe the same physical stock — same rule shape as
+    /// `ShoppingListItem.isSamePurchase(as:)`: a matching known `ingredientId` OR a matching
+    /// normalised name is sufficient (neither is reliable alone — see that method's docs for
+    /// the live-diagnosed reason), **and** the same unit and storage location, since a fridge
+    /// stash and a freezer stash of the same ingredient are genuinely separate lines. Unlike
+    /// the shopping list, this does not treat different-but-convertible units (e.g. tbsp vs
+    /// cups) as the same stock — pantry inventory numbers feed real deductions
+    /// (`UpdateInventoryAfterCookingUseCase`), so merging across units here stays exact-match
+    /// only, same as before.
+    func isSameStock(as other: PantryIngredient) -> Bool {
+        guard unit == other.unit, storageLocation == other.storageLocation else { return false }
+        if let lhsID = ingredientId, let rhsID = other.ingredientId, lhsID == rhsID {
+            return true
+        }
+        return ingredientName.normalizedIngredientName == other.ingredientName.normalizedIngredientName
     }
 
     /// Expiry classification as of a given moment (default: now).
     func expiryStatus(asOf now: Date = Date()) -> ExpiryStatus {
         ExpiryStatus(expiryDate: expiryDate, asOf: now)
-    }
-
-    struct MergeKey: Hashable {
-        let normalizedName: String
-        let unit: IngredientUnit
-        let storageLocation: StorageLocation
     }
 }
 

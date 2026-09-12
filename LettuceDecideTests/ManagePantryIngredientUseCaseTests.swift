@@ -84,6 +84,32 @@ struct ManagePantryIngredientUseCaseTests {
         #expect(pantry.count == 2)
     }
 
+    @Test func add_recordsTheIngredientIdWhenSupplied() throws {
+        let (useCase, _) = makeUseCase()
+
+        let pantry = try useCase.execute(
+            .add(name: "olive oil", quantity: 500, unit: .millilitres, storageLocation: .pantry, expiryDate: nil, ingredientId: 4053),
+            now: today
+        )
+
+        #expect(pantry.first?.ingredientId == 4053)
+    }
+
+    @Test func add_mergesByIdEvenWhenNamesDiffer() throws {
+        let existing = PantryIngredient(
+            ingredientName: "spring onion", quantity: 2, unit: .pieces, storageLocation: .fridge, ingredientId: 11291
+        )
+        let (useCase, _) = makeUseCase([existing])
+
+        let pantry = try useCase.execute(
+            .add(name: "green onions", quantity: 3, unit: .pieces, storageLocation: .fridge, expiryDate: nil, ingredientId: 11291),
+            now: today
+        )
+
+        #expect(pantry.count == 1)
+        #expect(pantry.first?.quantity == 5)
+    }
+
     // MARK: - update
 
     @Test func update_changesTheLineInPlace() throws {
