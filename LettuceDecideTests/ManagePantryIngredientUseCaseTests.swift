@@ -84,6 +84,67 @@ struct ManagePantryIngredientUseCaseTests {
         #expect(pantry.count == 2)
     }
 
+    // MARK: - Volume normalisation
+
+    @Test func add_normalisesAVolumeUnitToMillilitresEvenWithNoExistingLine() throws {
+        let (useCase, store) = makeUseCase()
+
+        let pantry = try useCase.execute(
+            .add(name: "olive oil", quantity: 2, unit: .cups, storageLocation: .pantry, expiryDate: nil),
+            now: today
+        )
+
+        // 2 cups -> 480ml, converted unconditionally, not only when it collides with an
+        // existing line.
+        #expect(pantry.first?.unit == .millilitres)
+        #expect(pantry.first?.quantity == 480)
+        #expect(store.load().first?.unit == .millilitres)
+    }
+
+    @Test func add_normalisesAndMergesOntoAnExistingMillilitresLine() throws {
+        let existing = PantryIngredient(
+            ingredientName: "olive oil", quantity: 100, unit: .millilitres, storageLocation: .pantry
+        )
+        let (useCase, _) = makeUseCase([existing])
+
+        let pantry = try useCase.execute(
+            .add(name: "olive oil", quantity: 1, unit: .cups, storageLocation: .pantry, expiryDate: nil),
+            now: today
+        )
+
+        #expect(pantry.count == 1)
+        #expect(pantry.first?.quantity == 340) // 100ml already there + 240ml (1 cup)
+    }
+
+    @Test func add_neverMergesAVolumeLineWithAGramsOrPiecesLineForTheSameIngredient() throws {
+        let existing = PantryIngredient(
+            ingredientName: "onion", quantity: 500, unit: .grams, storageLocation: .fridge
+        )
+        let (useCase, _) = makeUseCase([existing])
+
+        let pantry = try useCase.execute(
+            .add(name: "onion", quantity: 1, unit: .cups, storageLocation: .fridge, expiryDate: nil),
+            now: today
+        )
+
+        #expect(pantry.count == 2) // never guesses a cup <-> gram conversion
+        #expect(Set(pantry.map(\.unit)) == [.grams, .millilitres])
+    }
+
+    @Test func update_normalisesAVolumeUnitToMillilitres() throws {
+        let line = PantryIngredient(ingredientName: "milk", quantity: 200, unit: .millilitres, storageLocation: .fridge)
+        let (useCase, store) = makeUseCase([line])
+
+        let pantry = try useCase.execute(
+            .update(id: line.id, quantity: 1, unit: .cups, storageLocation: .fridge, expiryDate: nil),
+            now: today
+        )
+
+        #expect(pantry.first?.unit == .millilitres)
+        #expect(pantry.first?.quantity == 240)
+        #expect(store.load().first?.unit == .millilitres)
+    }
+
     @Test func add_recordsTheIngredientIdWhenSupplied() throws {
         let (useCase, _) = makeUseCase()
 
