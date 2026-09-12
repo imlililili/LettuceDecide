@@ -106,6 +106,87 @@ struct ConfirmPlannedMealUseCaseTests {
         #expect(chickpeas?.requiredQuantity == 200)
     }
 
+    /// The exact scenario from the user's bug report: confirming two *different* days, each
+    /// independently, whose recipes both need the same ingredient. This is the real
+    /// regression this branch fixes — a prior test only ever checked merging *within* one
+    /// call's items; the actual bug was that a second, separate `execute` call for a later
+    /// day never found (and combined with) what an earlier call had already persisted.
+    @Test func confirmingTwoDifferentDaysWithTheSameIngredientMergesAcrossTheTwoCalls() {
+        let (useCase, _, shoppingListStore, _) = makeUseCase()
+
+        useCase.execute(
+            recipe: recipe(1, ingredients: [ingredient(9152, "lemon juice", 1, .tablespoons)]),
+            date: monday, calendar: .current, now: monday
+        )
+        useCase.execute(
+            recipe: recipe(2, ingredients: [ingredient(9152, "lemon juice", 1, .tablespoons)]),
+            date: tuesday, calendar: .current, now: tuesday
+        )
+
+        let lemonJuiceLines = shoppingListStore.loadItems().filter { $0.ingredientName == "lemon juice" }
+        #expect(lemonJuiceLines.count == 1)
+        #expect(lemonJuiceLines.first?.requiredQuantity == 2)
+    }
+
+    /// Same scenario, but the two recipes' ingredient lines carry the identical display name
+    /// with *different* Spoonacular ids — live-diagnosed as a real thing Spoonacular's own
+    /// data does (e.g. "olive oil" tagged 4053 in most recipes, 1034053 for an "extra virgin"
+    /// variant). Matching by id alone would leave these on two lines forever; the fix matches
+    /// on name too.
+    @Test func confirmingTwoDifferentDaysWhoseIngredientsShareANameButNotAnIdStillMergesAcrossCalls() {
+        let (useCase, _, shoppingListStore, _) = makeUseCase()
+
+        useCase.execute(
+            recipe: recipe(1, ingredients: [ingredient(4053, "olive oil", 2, .tablespoons)]),
+            date: monday, calendar: .current, now: monday
+        )
+        useCase.execute(
+            recipe: recipe(2, ingredients: [ingredient(1_034_053, "olive oil", 1, .tablespoons)]),
+            date: tuesday, calendar: .current, now: tuesday
+        )
+
+        let oliveOilLines = shoppingListStore.loadItems().filter { $0.ingredientName == "olive oil" }
+        #expect(oliveOilLines.count == 1)
+        #expect(oliveOilLines.first?.requiredQuantity == 3)
+    }
+
+    /// Same regression, against the real file-backed store, with a *fresh* store instance per
+    /// call (simulating two different app launches, or two different view instantiations,
+    /// pointing at the same on-disk file) — directly answering the user's suspicion that this
+    /// might be a storage-layer bug rather than a merge-logic one. It reads/writes the same
+    /// file both times, so it must merge exactly like the in-memory case above.
+    @Test func confirmingTwoDaysWithFreshFileBackedStoreInstancesStillMergesAcrossCalls() {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("confirm-cross-call-tests-\(UUID().uuidString)", isDirectory: true)
+            .appendingPathComponent("shopping-list.json")
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+
+        let confirmedMealStore = InMemoryConfirmedMealStore()
+        let pantryStore = InMemoryPantryStore()
+
+        ConfirmPlannedMealUseCase(
+            confirmedMealStore: confirmedMealStore,
+            pantryStore: pantryStore,
+            addToShoppingList: AddMissingIngredientsToShoppingListUseCase(store: ShoppingListStore(fileURL: url))
+        ).execute(
+            recipe: recipe(1, ingredients: [ingredient(9152, "lemon juice", 1, .tablespoons)]),
+            date: monday, calendar: .current, now: monday
+        )
+
+        ConfirmPlannedMealUseCase(
+            confirmedMealStore: confirmedMealStore,
+            pantryStore: pantryStore,
+            addToShoppingList: AddMissingIngredientsToShoppingListUseCase(store: ShoppingListStore(fileURL: url))
+        ).execute(
+            recipe: recipe(2, ingredients: [ingredient(9152, "lemon juice", 1, .tablespoons)]),
+            date: tuesday, calendar: .current, now: tuesday
+        )
+
+        let finalItems = ShoppingListStore(fileURL: url).loadItems()
+        #expect(finalItems.count == 1)
+        #expect(finalItems.first?.requiredQuantity == 2)
+    }
+
     @Test func reconfirmingTheSameDayWithADifferentRecipeReplacesTheConfirmedMeal() {
         let (useCase, confirmedMealStore, _, _) = makeUseCase(confirmedMeals: [
             ConfirmedMeal(date: monday, recipe: recipe(1))

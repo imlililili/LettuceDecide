@@ -129,6 +129,37 @@ struct SpoonacularDecodingEdgeCaseTests {
         #expect(!flour.quantityIsUncertain)
     }
 
+    /// Regression for the diagnosed "potatoes 200 pcs" bug — a *different* root cause from
+    /// the "servings" one above, confirmed live with the exact numbers: a real recipe's
+    /// "Country Potato" line was `{ amount: 200, unit: "gr" }` (grams abbreviation), and a
+    /// separate live recipe used `{ amount: 0.5, unit: "kg" }` for potatoes. Neither "gr" nor
+    /// "kg" was recognised, so both silently fell back to `.pieces` with the amount
+    /// unchanged — "200 gr" of potatoes became "200 pieces" of potatoes. Unlike the
+    /// "servings" case, this amount is entirely trustworthy once correctly parsed — it must
+    /// NOT be flagged uncertain, just correctly converted.
+    @Test func gramsAndKilogramAbbreviationsAreParsedAsTrustworthyGramQuantities() throws {
+        let json = """
+        { "results": [ { "id": 1, "title": "T", "extendedIngredients": [
+            { "id": 30, "name": "potatoes", "amount": 200, "unit": "gr" },
+            { "id": 31, "name": "leeks", "amount": 0.5, "unit": "kg" }
+        ] } ] }
+        """.data(using: .utf8)!
+
+        let ingredients = try #require(
+            try SpoonacularRecipeRepository.parseCandidates(from: json).first?.recipe.requiredIngredients
+        )
+
+        let potatoes = try #require(ingredients.first { $0.name == "potatoes" })
+        #expect(potatoes.unit == .grams)
+        #expect(potatoes.requiredQuantity == 200) // NOT 200 pieces
+        #expect(!potatoes.quantityIsUncertain)
+
+        let leeks = try #require(ingredients.first { $0.name == "leeks" })
+        #expect(leeks.unit == .grams)
+        #expect(leeks.requiredQuantity == 500) // 0.5 kg correctly rescaled to 500g
+        #expect(!leeks.quantityIsUncertain)
+    }
+
     /// "c" is a common Spoonacular abbreviation for cups (confirmed live: 9 occurrences in a
     /// single 100-recipe sample) that wasn't in the recognised set — it fell back to
     /// `.pieces`, quietly miscategorising a volume amount as a piece count.

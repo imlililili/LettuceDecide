@@ -99,6 +99,33 @@ struct IngredientUnitTests {
         #expect(IngredientUnit.tablespoons.measurementGroup == .volume)
         #expect(IngredientUnit.teaspoons.measurementGroup == .volume)
     }
+
+    /// Live-diagnosed: "gr" is a real Spoonacular grams abbreviation that wasn't recognised,
+    /// silently falling back to `.pieces` — directly implicated in the reported
+    /// "potatoes 200 pcs" (the source line was "200 gr", i.e. 200 grams).
+    @Test func recognisesTheGrAbbreviationForGrams() {
+        #expect(IngredientUnit(spoonacularUnit: "gr") == .grams)
+        #expect(IngredientUnit(spoonacularUnit: "GR") == .grams)
+    }
+}
+
+struct IngredientUnitRescalingTests {
+    /// Live-diagnosed: "kg"/"kilogram(s)" isn't a string this app's unit set can name
+    /// directly (there's no `.kilograms` case), and without rescaling the amount it fell
+    /// through to `.pieces` unchanged — a "0.5 kg" ingredient silently became "0.5 pieces".
+    @Test func kilogramVariantsRescaleToGrams() {
+        for raw in ["kg", "Kg", "kilogram", "kilograms"] {
+            let result = IngredientUnit.rescaledAmount(0.5, rawUnit: raw)
+            #expect(result?.unit == .grams, "unit for \(raw)")
+            #expect(result?.amount == 500, "amount for \(raw)")
+        }
+    }
+
+    @Test func returnsNilForUnitsThatDoNotNeedRescaling() {
+        #expect(IngredientUnit.rescaledAmount(200, rawUnit: "gr") == nil) // "gr" is already gram-scaled
+        #expect(IngredientUnit.rescaledAmount(2, rawUnit: "cups") == nil)
+        #expect(IngredientUnit.rescaledAmount(3, rawUnit: "pieces") == nil)
+    }
 }
 
 struct VolumeConversionTests {

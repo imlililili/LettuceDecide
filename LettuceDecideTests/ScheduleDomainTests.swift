@@ -80,39 +80,60 @@ struct ScheduleEntryTests {
 }
 
 struct ShoppingListItemTests {
-    @Test func mergeKeyIgnoresCasePluralAndQuantity() {
+    @Test func isSamePurchaseIgnoresCasePluralAndQuantityWhenIdsAreNil() {
         let a = ShoppingListItem(ingredientName: "Tomatoes", requiredQuantity: 3, unit: .pieces)
         let b = ShoppingListItem(ingredientName: "tomato", requiredQuantity: 99, unit: .pieces)
-        #expect(a.mergeKey == b.mergeKey)
+        #expect(a.isSamePurchase(as: b))
     }
 
-    @Test func mergeKeyDistinguishesMeasurementGroupNotJustTheLiteralUnit() {
+    @Test func isSamePurchaseRequiresTheSameMeasurementGroupNotJustTheLiteralUnit() {
         let grams = ShoppingListItem(ingredientName: "flour", requiredQuantity: 200, unit: .grams)
         let cups = ShoppingListItem(ingredientName: "flour", requiredQuantity: 2, unit: .cups)
-        #expect(grams.mergeKey != cups.mergeKey) // weight vs volume — never merge
+        #expect(!grams.isSamePurchase(as: cups)) // weight vs volume — never merge
 
         let tbsp = ShoppingListItem(ingredientName: "flour", requiredQuantity: 4, unit: .tablespoons)
-        #expect(cups.mergeKey == tbsp.mergeKey) // both volume — same key, ready to merge
+        #expect(cups.isSamePurchase(as: tbsp)) // both volume — mergeable
     }
 
-    @Test func mergeKeyPrefersIngredientIdOverName() {
-        // Different display names (as Spoonacular's own varied phrasing produces), same id.
+    @Test func isSamePurchaseMatchesOnEitherIdOrNameNotIdOnly() {
+        // Live-diagnosed: Spoonacular's own data tags the identical display string "olive
+        // oil" with different ingredient ids across recipes (4053 in most, 1034053 for its
+        // "extra virgin" variant) — an id-only or id-priority match would leave these on two
+        // separate lines forever. Matching by name too (whenever it's identical) fixes it.
+        let a = ShoppingListItem(ingredientName: "olive oil", requiredQuantity: 2, unit: .tablespoons, ingredientId: 4053)
+        let b = ShoppingListItem(ingredientName: "olive oil", requiredQuantity: 1, unit: .tablespoons, ingredientId: 1_034_053)
+        #expect(a.isSamePurchase(as: b))
+    }
+
+    @Test func isSamePurchaseMatchesOnIdEvenWhenNamesDiffer() {
+        let a = ShoppingListItem(ingredientName: "spring onion", requiredQuantity: 2, unit: .pieces, ingredientId: 11291)
+        let b = ShoppingListItem(ingredientName: "green onions", requiredQuantity: 3, unit: .pieces, ingredientId: 11291)
+        #expect(a.isSamePurchase(as: b))
+    }
+
+    /// Documents a known, deliberate non-fix: live-diagnosed, "garlic" and "garlic clove"
+    /// carry genuinely *different* real Spoonacular ids (11215 vs 10211215) as well as
+    /// different normalised names — matching on "roughly the same food, worded differently"
+    /// would need stripping descriptor words (clove, bulb, pod, powder…) heuristically, which
+    /// risks merging things that are not the same purchase (e.g. "onion" vs "onion powder").
+    /// Out of scope here; two lines is the honest, safe result until that's solved on purpose.
+    @Test func isSamePurchaseDoesNotMatchDifferentlyWordedIngredientsWithDifferentIds() {
         let garlic = ShoppingListItem(ingredientName: "garlic", requiredQuantity: 2, unit: .pieces, ingredientId: 11215)
         let garlicClove = ShoppingListItem(
-            ingredientName: "garlic clove", requiredQuantity: 3, unit: .pieces, ingredientId: 11215
+            ingredientName: "garlic clove", requiredQuantity: 3, unit: .pieces, ingredientId: 10_211_215
         )
-        #expect(garlic.mergeKey == garlicClove.mergeKey)
+        #expect(!garlic.isSamePurchase(as: garlicClove))
     }
 
-    @Test func mergeKeyFallsBackToNameWhenIdIsNil() {
+    @Test func isSamePurchaseFallsBackToNameWhenIdIsNil() {
         let a = ShoppingListItem(ingredientName: "onion", requiredQuantity: 1, unit: .pieces, ingredientId: nil)
         let b = ShoppingListItem(ingredientName: "onion", requiredQuantity: 2, unit: .pieces, ingredientId: nil)
-        #expect(a.mergeKey == b.mergeKey)
+        #expect(a.isSamePurchase(as: b))
 
-        // A known id never collapses onto a nil-id line for the same name — they're not
-        // known to be the same ingredient, only assumed to be by string.
+        // A known id still matches a nil-id line for the same name — the name is a real
+        // enough signal on its own (see isSamePurchaseMatchesOnEitherIdOrNameNotIdOnly).
         let withID = ShoppingListItem(ingredientName: "onion", requiredQuantity: 1, unit: .pieces, ingredientId: 11282)
-        #expect(withID.mergeKey != a.mergeKey)
+        #expect(withID.isSamePurchase(as: a))
     }
 
     @Test func roundTripsThroughJSON() throws {
@@ -142,9 +163,9 @@ struct ShoppingListItemTests {
 }
 
 /// Regression coverage for `Array<ShoppingListItem>.addMerging` — the redesigned merge rule
-/// from a real user report: the same ingredient (id-matched) split across several lines by
-/// unit, some of which should have merged (volume) and some of which correctly shouldn't
-/// (weight/count never guess a conversion).
+/// from a real user report: the same ingredient split across several lines by unit or by id,
+/// some of which should have merged (volume, or identical-name-different-id) and some of
+/// which correctly shouldn't (weight/count never guess a conversion).
 struct ShoppingListMergingTests {
     private func item(
         _ name: String,
@@ -158,11 +179,24 @@ struct ShoppingListMergingTests {
 
     @Test func mergesByIdEvenWhenNamesDiffer() {
         var list: [ShoppingListItem] = []
-        list.addMerging(item("garlic", 2, .pieces, id: 11215))
-        list.addMerging(item("garlic clove", 3, .pieces, id: 11215))
+        // "spring onion" / "green onions": both live-diagnosed as Spoonacular id 11291.
+        list.addMerging(item("spring onion", 2, .pieces, id: 11291))
+        list.addMerging(item("green onions", 3, .pieces, id: 11291))
 
         #expect(list.count == 1)
         #expect(list.first?.requiredQuantity == 5)
+    }
+
+    /// The user-reported symptom that proved id-priority matching was wrong: two lines
+    /// reading the identical "olive oil", from recipes Spoonacular happened to tag with
+    /// different ids (live-diagnosed: 4053 vs 1034053), must still merge into one line.
+    @Test func mergesByNameEvenWhenIdsDifferForTheSameDisplayedIngredient() {
+        var list: [ShoppingListItem] = []
+        list.addMerging(item("olive oil", 2, .tablespoons, id: 4053))
+        list.addMerging(item("olive oil", 1, .tablespoons, id: 1_034_053))
+
+        #expect(list.count == 1)
+        #expect(list.first?.requiredQuantity == 3)
     }
 
     @Test func mergesVolumeUnitsWithTheCorrectConvertedTotal() {
