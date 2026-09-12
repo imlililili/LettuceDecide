@@ -48,6 +48,14 @@ struct HomeView: View {
                         Section("Shopping list") {
                             ForEach(viewModel.shoppingList) { item in
                                 ShoppingListItemRow(item: item)
+                                    .swipeActions(edge: .leading) {
+                                        Button {
+                                            viewModel.markAsBought(item)
+                                        } label: {
+                                            Label("Bought", systemImage: "checkmark")
+                                        }
+                                        .tint(.green)
+                                    }
                             }
                         }
                     }
@@ -55,6 +63,24 @@ struct HomeView: View {
             }
         }
         .navigationTitle("Home")
+        .sheet(item: $viewModel.pendingUncertainPurchase) { item in
+            ConfirmPurchaseAmountView(
+                item: item,
+                onConfirm: { quantity, unit in viewModel.confirmUncertainPurchase(quantity: quantity, unit: unit) },
+                onCancel: { viewModel.cancelUncertainPurchase() }
+            )
+        }
+        .alert(
+            "Couldn't add to your pantry",
+            isPresented: Binding(
+                get: { viewModel.errorMessage != nil },
+                set: { if !$0 { viewModel.errorMessage = nil } }
+            )
+        ) {
+            Button("OK") { viewModel.errorMessage = nil }
+        } message: {
+            Text(viewModel.errorMessage ?? "")
+        }
     }
 }
 
@@ -104,13 +130,19 @@ private struct ConfirmedMealCard: View {
         ),
     ])
     let shoppingListStore = InMemoryShoppingListStore(initial: [
-        ShoppingListItem(ingredientName: "curry powder", requiredQuantity: 1, unit: .tablespoons),
-        ShoppingListItem(ingredientName: "mozzarella", requiredQuantity: 200, unit: .grams),
+        ShoppingListItem(ingredientName: "curry powder", requiredQuantity: 1, unit: .tablespoons, ingredientId: 1_022_047),
+        ShoppingListItem(ingredientName: "mozzarella", requiredQuantity: 200, unit: .grams, ingredientId: 1026),
+        ShoppingListItem(ingredientName: "green onions", requiredQuantity: 4, unit: .pieces, quantityIsUncertain: true),
     ])
+    let pantryStore = InMemoryPantryStore()
     return NavigationStack {
         HomeView(
-            viewModel: HomeViewModel(confirmedMealStore: confirmedMealStore, shoppingListStore: shoppingListStore),
-            pantryStore: InMemoryPantryStore(),
+            viewModel: HomeViewModel(
+                confirmedMealStore: confirmedMealStore,
+                shoppingListStore: shoppingListStore,
+                pantryStore: pantryStore
+            ),
+            pantryStore: pantryStore,
             addToShoppingList: AddMissingIngredientsToShoppingListUseCase(store: shoppingListStore),
             confirmedMealStore: confirmedMealStore,
             onNeedsPlanning: {}
@@ -119,13 +151,15 @@ private struct ConfirmedMealCard: View {
 }
 
 #Preview("Empty") {
-    NavigationStack {
+    let pantryStore = InMemoryPantryStore()
+    return NavigationStack {
         HomeView(
             viewModel: HomeViewModel(
                 confirmedMealStore: InMemoryConfirmedMealStore(),
-                shoppingListStore: InMemoryShoppingListStore()
+                shoppingListStore: InMemoryShoppingListStore(),
+                pantryStore: pantryStore
             ),
-            pantryStore: InMemoryPantryStore(),
+            pantryStore: pantryStore,
             addToShoppingList: AddMissingIngredientsToShoppingListUseCase(store: InMemoryShoppingListStore()),
             confirmedMealStore: InMemoryConfirmedMealStore(),
             onNeedsPlanning: {}

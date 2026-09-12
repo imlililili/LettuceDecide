@@ -50,7 +50,8 @@ struct ContentView: View {
         MainTabView(
             homeViewModel: HomeViewModel(
                 confirmedMealStore: confirmedMealStore,
-                shoppingListStore: shoppingListStore
+                shoppingListStore: shoppingListStore,
+                pantryStore: pantryStore
             ),
             pantryViewModel: PantryViewModel(store: pantryStore),
             weeklyPlannerViewModel: WeeklyPlannerViewModel(
