@@ -1,4 +1,5 @@
 import Foundation
+import Combine
 
 /// Persists the cook's confirmed Week Plan meals so the Home dashboard and its shopping list
 /// survive app relaunches.
@@ -11,6 +12,17 @@ protocol ConfirmedMealStoring {
     func confirm(_ meal: ConfirmedMeal)
     /// Removes the confirmed meal for `date`, if any. A no-op if that day has no entry.
     func removeConfirmedMeal(for date: Date)
+
+    /// Fires once after every successful `confirm` or `removeConfirmedMeal` — same contract as
+    /// `PantryStoring.changes`. Home shows confirmed meals on its own tab's `NavigationStack`,
+    /// so a card can be removed from a screen Home never reloads on return to (e.g. "Mark as
+    /// Cooked" surfacing a manual-review notice keeps Recipe Detail on screen); subscribing
+    /// here is what lets the card disappear the moment it happens rather than only on the next
+    /// tab switch.
+    ///
+    /// Delivered synchronously on the caller's thread. Every mutation in the app goes through
+    /// the main actor, so a main-actor subscriber can update its state directly.
+    var changes: AnyPublisher<Void, Never> { get }
 }
 
 /// File-backed `ConfirmedMealStoring`: one JSON document in Application Support.
@@ -22,6 +34,9 @@ final class ConfirmedMealStore: ConfirmedMealStoring {
     private let fileURL: URL
     private let encoder: JSONEncoder
     private let decoder: JSONDecoder
+    private let changeSubject = PassthroughSubject<Void, Never>()
+
+    var changes: AnyPublisher<Void, Never> { changeSubject.eraseToAnyPublisher() }
 
     init(fileURL: URL? = nil) {
         if let fileURL {
@@ -75,8 +90,10 @@ final class ConfirmedMealStore: ConfirmedMealStoring {
             )
             let data = try encoder.encode(meals)
             try data.write(to: fileURL, options: .atomic)
+            changeSubject.send()
         } catch {
-            // Best effort: a failed write leaves the previous file in place.
+            // Best effort: a failed write leaves the previous file in place and does not
+            // announce a change.
         }
     }
 }
@@ -84,6 +101,9 @@ final class ConfirmedMealStore: ConfirmedMealStoring {
 /// In-memory `ConfirmedMealStoring` for previews and tests — never touches the filesystem.
 final class InMemoryConfirmedMealStore: ConfirmedMealStoring {
     private var stored: [ConfirmedMeal]
+    private let changeSubject = PassthroughSubject<Void, Never>()
+
+    var changes: AnyPublisher<Void, Never> { changeSubject.eraseToAnyPublisher() }
 
     init(initial: [ConfirmedMeal] = []) {
         self.stored = initial
@@ -94,10 +114,12 @@ final class InMemoryConfirmedMealStore: ConfirmedMealStoring {
     func confirm(_ meal: ConfirmedMeal) {
         stored.removeAll { $0.id == meal.id }
         stored.append(meal)
+        changeSubject.send()
     }
 
     func removeConfirmedMeal(for date: Date) {
         let key = Calendar.current.startOfDay(for: date)
         stored.removeAll { $0.id == key }
+        changeSubject.send()
     }
 }

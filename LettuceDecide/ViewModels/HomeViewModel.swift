@@ -4,11 +4,12 @@ import Combine
 /// The Home dashboard: every meal the cook has confirmed from the Week Plan, and the
 /// persisted shopping list built from confirming them.
 ///
-/// Deliberately just a reload-on-demand read of two stores, not a live subscription —
-/// confirming happens on a different tab's `NavigationStack` (Calendar → Week Plan → Recipe
-/// Detail), so there's no in-place pantry-style `changes` publisher to react to here.
-/// `MainTabView` reloads this when the cook switches to the Home tab; `onCooked` reloads it
-/// after marking a confirmed meal cooked from within Home's own stack.
+/// `MainTabView` also reloads this when the cook switches to the Home tab (covers changes made
+/// on another tab, e.g. confirming a day from Calendar → Week Plan). The `confirmedMealStore`
+/// subscription below covers changes made from *within* Home's own `NavigationStack` — Recipe
+/// Detail pushed from a confirmed-meal card doesn't always pop back on "Mark as Cooked" (a
+/// manual-review notice keeps the screen open), so a plain "reload when the screen reappears"
+/// rule would miss those. Same pattern as `PantryStoring.changes`.
 @MainActor
 final class HomeViewModel: ObservableObject {
     @Published private(set) var confirmedMeals: [ConfirmedMeal] = []
@@ -23,12 +24,20 @@ final class HomeViewModel: ObservableObject {
     private let confirmedMealStore: ConfirmedMealStoring
     private let shoppingListStore: ShoppingListStoring
     private let purchaseItem: PurchaseShoppingListItemUseCase
+    private var confirmedMealChangeCancellable: AnyCancellable?
 
     init(confirmedMealStore: ConfirmedMealStoring, shoppingListStore: ShoppingListStoring, pantryStore: PantryStoring) {
         self.confirmedMealStore = confirmedMealStore
         self.shoppingListStore = shoppingListStore
         self.purchaseItem = PurchaseShoppingListItemUseCase(shoppingListStore: shoppingListStore, pantryStore: pantryStore)
         reload()
+
+        confirmedMealChangeCancellable = confirmedMealStore.changes
+            .sink { [weak self] in
+                MainActor.assumeIsolated {
+                    self?.reload()
+                }
+            }
     }
 
     var isEmpty: Bool { confirmedMeals.isEmpty }

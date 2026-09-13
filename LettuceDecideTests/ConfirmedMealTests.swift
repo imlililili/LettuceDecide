@@ -1,3 +1,4 @@
+import Combine
 import Foundation
 import Testing
 @testable import LettuceDecide
@@ -101,5 +102,45 @@ struct ConfirmedMealStoreTests {
             .appendingPathComponent("confirmed-meal-store-tests-\(UUID().uuidString)")
             .appendingPathComponent("confirmed-meals.json")
         #expect(ConfirmedMealStore(fileURL: url).loadConfirmedMeals().isEmpty)
+    }
+
+    // MARK: - changes publisher (same contract as PantryStoring.changes)
+
+    @Test func inMemoryStoreAnnouncesAChangeAfterConfirm() {
+        let store = InMemoryConfirmedMealStore()
+        var changeCount = 0
+        let cancellable = store.changes.sink { changeCount += 1 }
+
+        store.confirm(meal(1, on: anchor))
+
+        #expect(changeCount == 1)
+        withExtendedLifetime(cancellable) {}
+    }
+
+    @Test func inMemoryStoreAnnouncesAChangeAfterRemoval() {
+        let store = InMemoryConfirmedMealStore(initial: [meal(1, on: anchor)])
+        var changeCount = 0
+        let cancellable = store.changes.sink { changeCount += 1 }
+
+        store.removeConfirmedMeal(for: anchor)
+
+        #expect(changeCount == 1)
+        withExtendedLifetime(cancellable) {}
+    }
+
+    @Test func fileStoreAnnouncesAChangeAfterConfirmAndRemoval() {
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("confirmed-meal-store-tests-\(UUID().uuidString)")
+            .appendingPathComponent("confirmed-meals.json")
+        defer { try? FileManager.default.removeItem(at: url.deletingLastPathComponent()) }
+        let store = ConfirmedMealStore(fileURL: url)
+        var changeCount = 0
+        let cancellable = store.changes.sink { changeCount += 1 }
+
+        store.confirm(meal(1, on: anchor))
+        store.removeConfirmedMeal(for: anchor)
+
+        #expect(changeCount == 2)
+        withExtendedLifetime(cancellable) {}
     }
 }

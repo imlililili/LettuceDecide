@@ -188,6 +188,111 @@ struct RecipeDetailViewModelTests {
         #expect(viewModel.notice == nil)
     }
 
+    // MARK: - Mark as Cooked always drops the confirmed-meal record for that day
+
+    @Test func fromConfirmed_markAsCookedRemovesTheConfirmedMealOnSuccess() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let curry = recipe([RecipeIngredient(id: 1, name: "flour", requiredQuantity: 200, unit: .grams)])
+        let confirmedMealStore = InMemoryConfirmedMealStore(initial: [
+            ConfirmedMeal(date: now, recipe: curry, confirmedAt: now)
+        ])
+        let viewModel = makeViewModel(
+            curry,
+            pantryStore: InMemoryPantryStore(initial: [
+                PantryIngredient(ingredientName: "flour", quantity: 500, unit: .grams, storageLocation: .pantry)
+            ]),
+            confirmedMealStore: confirmedMealStore,
+            context: .confirmed(date: now),
+            now: now
+        )
+
+        viewModel.markAsCooked()
+
+        #expect(viewModel.notice?.dismissPops == true)
+        #expect(confirmedMealStore.loadConfirmedMeals().isEmpty)
+    }
+
+    /// The easiest edge case to miss: a same-measurement-group mismatch lands in
+    /// `needsManualReview` (the recipe olive-oil bug), which is still a *successful*
+    /// `execute()` call — nothing thrown — so this was already covered by the success path
+    /// above. What isn't obvious is that a genuine thrown error must not block removal either:
+    /// the cook already ate the meal regardless of whether the pantry bookkeeping that follows
+    /// goes smoothly.
+    @Test func fromConfirmed_markAsCookedRemovesTheConfirmedMealEvenWhenDeductionNeedsManualReview() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let curry = recipe([RecipeIngredient(id: 1, name: "olive oil", requiredQuantity: 2, unit: .tablespoons)])
+        let confirmedMealStore = InMemoryConfirmedMealStore(initial: [
+            ConfirmedMeal(date: now, recipe: curry, confirmedAt: now)
+        ])
+        let viewModel = makeViewModel(
+            curry,
+            pantryStore: InMemoryPantryStore(initial: [
+                // Genuinely cross-group (pieces, not a volume unit) — can't be converted, so
+                // this recipe's olive oil is reported in `needsManualReview`, not deducted.
+                PantryIngredient(ingredientName: "olive oil", quantity: 1, unit: .pieces, storageLocation: .pantry)
+            ]),
+            confirmedMealStore: confirmedMealStore,
+            context: .confirmed(date: now),
+            now: now
+        )
+
+        viewModel.markAsCooked()
+
+        #expect(viewModel.notice?.dismissPops == true) // still a successful call, just flagged
+        #expect(confirmedMealStore.loadConfirmedMeals().isEmpty)
+    }
+
+    @Test func fromConfirmed_markAsCookedRemovesTheConfirmedMealEvenWhenTheDeductionThrows() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let curry = recipe([RecipeIngredient(id: 1, name: "flour", requiredQuantity: 250, unit: .grams)])
+        let confirmedMealStore = InMemoryConfirmedMealStore(initial: [
+            ConfirmedMeal(date: now, recipe: curry, confirmedAt: now)
+        ])
+        let viewModel = makeViewModel(
+            curry,
+            pantryStore: InMemoryPantryStore(initial: [
+                PantryIngredient(ingredientName: "flour", quantity: 100, unit: .grams, storageLocation: .pantry)
+            ]),
+            confirmedMealStore: confirmedMealStore,
+            context: .confirmed(date: now),
+            now: now
+        )
+
+        viewModel.markAsCooked()
+
+        // The pantry error notice stays up (dismissPops false, same as before this fix) — only
+        // the confirmed-meal bookkeeping changed.
+        #expect(viewModel.notice?.dismissPops == false)
+        #expect(confirmedMealStore.loadConfirmedMeals().isEmpty)
+    }
+
+    /// `.weekPlan` shares the exact same "Mark as Cooked" button and date-gating rule as
+    /// `.confirmed` (see `canMarkAsCooked`'s doc comment) — a day can be marked cooked straight
+    /// from the Week Plan preview without ever having been confirmed first, so the same
+    /// unconditional removal applies there too (a no-op when nothing was confirmed for that
+    /// day, same as `ConfirmedMealStoring.removeConfirmedMeal` documents).
+    @Test func fromWeekPlan_markAsCookedRemovesAnyConfirmedMealForThatDayToo() {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let today = Calendar.current.startOfDay(for: now)
+        let curry = recipe([RecipeIngredient(id: 1, name: "flour", requiredQuantity: 200, unit: .grams)])
+        let confirmedMealStore = InMemoryConfirmedMealStore(initial: [
+            ConfirmedMeal(date: today, recipe: curry, confirmedAt: now)
+        ])
+        let viewModel = makeViewModel(
+            curry,
+            pantryStore: InMemoryPantryStore(initial: [
+                PantryIngredient(ingredientName: "flour", quantity: 500, unit: .grams, storageLocation: .pantry)
+            ]),
+            confirmedMealStore: confirmedMealStore,
+            context: .weekPlan(date: today),
+            now: now
+        )
+
+        viewModel.markAsCooked()
+
+        #expect(confirmedMealStore.loadConfirmedMeals().isEmpty)
+    }
+
     // MARK: - .weekPlan: confirming never touches the pantry
 
     @Test func fromWeekPlan_aFutureDayCannotBeMarkedCooked() {

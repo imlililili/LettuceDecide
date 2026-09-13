@@ -44,6 +44,7 @@ final class RecipeDetailViewModel: ObservableObject {
     private let pantryStore: PantryStoring
     private let updateInventory: UpdateInventoryAfterCookingUseCase
     private let addToShoppingList: AddMissingIngredientsToShoppingListUseCase
+    private let confirmedMealStore: ConfirmedMealStoring
     private let confirmPlannedMealUseCase: ConfirmPlannedMealUseCase
     private let now: Date
     private var pantryChangeCancellable: AnyCancellable?
@@ -81,6 +82,7 @@ final class RecipeDetailViewModel: ObservableObject {
         self.pantryStore = pantryStore
         self.updateInventory = UpdateInventoryAfterCookingUseCase(store: pantryStore)
         self.addToShoppingList = addToShoppingList
+        self.confirmedMealStore = confirmedMealStore
         self.confirmPlannedMealUseCase = ConfirmPlannedMealUseCase(
             confirmedMealStore: confirmedMealStore,
             pantryStore: pantryStore,
@@ -113,9 +115,14 @@ final class RecipeDetailViewModel: ObservableObject {
     /// already-confirmed meal — the only thing that differs between them is whether there's
     /// still a "confirm" action to offer.
     var canMarkAsCooked: Bool {
+        Calendar.current.startOfDay(for: contextDate) <= Calendar.current.startOfDay(for: now)
+    }
+
+    /// The day this recipe is for, regardless of which entry point opened the screen.
+    private var contextDate: Date {
         switch context {
         case .weekPlan(let date), .confirmed(let date):
-            return Calendar.current.startOfDay(for: date) <= Calendar.current.startOfDay(for: now)
+            return date
         }
     }
 
@@ -158,7 +165,16 @@ final class RecipeDetailViewModel: ObservableObject {
         )
     }
 
+    /// Tapping this means the cook actually ate the meal — true whether or not the pantry
+    /// bookkeeping that follows goes smoothly, so the confirmed-meal record for this day is
+    /// always dropped here, not only on a clean deduction. A same-measurement-group mismatch
+    /// that lands in `needsManualReview` (see `UpdateInventoryAfterCookingUseCase`) is already
+    /// a successful call — that case was always covered. What this also covers: a genuine
+    /// pantry error (`InventoryUpdateError`, nothing saved) must not leave a "still to cook"
+    /// card stuck on Home for a meal that, from the cook's side, is already done; fixing the
+    /// pantry mismatch that caused the error is a separate concern from that.
     func markAsCooked() {
+        confirmedMealStore.removeConfirmedMeal(for: contextDate)
         do {
             let outcome = try updateInventory.execute(currentMatch)
             notice = Notice(title: "Marked as cooked", message: message(for: outcome), dismissPops: true)
