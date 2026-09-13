@@ -117,6 +117,83 @@ struct UpdateInventoryAfterCookingUseCaseTests {
         #expect(pantry.first { $0.ingredientName == "paprika" }?.quantity == 55) // 60 - 5ml (1 tsp)
     }
 
+    // MARK: - Real "Crunchy Brussels Sprouts" regression (bare "T" unit corruption)
+
+    /// Real live-fetched Spoonacular data for recipe id 640941, "Crunchy Brussels Sprouts
+    /// Side Dish" (captured 2026-09-13). This recipe's own olive oil line spells out "Tbs" in
+    /// full and always decoded correctly on its own — the actual root cause of the user's
+    /// Mark-as-Cooked failure was a *different* recipe's olive oil line using the bare "T"
+    /// abbreviation, which (before the IngredientUnit fix) silently corrupted the pantry's
+    /// olive oil into an unconvertible `.pieces` count. This fixture proves the two halves of
+    /// that story: a clean pantry deducts this real recipe fully, and a `.pieces`-corrupted
+    /// olive oil line reproduces the user's exact symptom precisely.
+    private func realCrunchyBrusselsSprouts() throws -> Recipe {
+        let json = """
+        { "results": [ {
+          "id": 640941, "title": "Crunchy Brussels Sprouts Side Dish", "readyInMinutes": 30,
+          "extendedIngredients": [
+            { "id": 1002030, "name": "pepper", "nameClean": "pepper", "amount": 0.25, "unit": "tsp" },
+            { "id": 11098, "name": "brussels sprouts", "nameClean": "brussels sprouts", "amount": 800.0, "unit": "g" },
+            { "id": 1032046, "name": "dijon mustard", "nameClean": "dijon mustard", "amount": 1.0, "unit": "tsp" },
+            { "id": 19296, "name": "honey", "nameClean": "honey", "amount": 0.5, "unit": "tsp" },
+            { "id": 4053, "name": "olive oil", "nameClean": "olive oil", "amount": 3.0, "unit": "Tbs" },
+            { "id": 1022068, "name": "red wine vinegar", "nameClean": "red wine vinegar", "amount": 2.0, "unit": "Tbs" },
+            { "id": 12155, "name": "walnuts", "nameClean": "walnuts", "amount": 0.25, "unit": "cup" }
+          ]
+        } ] }
+        """
+        let candidate = try SpoonacularRecipeRepository.parseCandidates(from: json.data(using: .utf8)!).first
+        return try #require(candidate?.recipe)
+    }
+
+    @Test func updateInventory_deductsTheRealBrusselsSproutsRecipeCleanlyWhenThePantryIsAllVolumeOrWeightMatched() throws {
+        let cooked = try realCrunchyBrusselsSprouts()
+        let pantry = [
+            PantryIngredient(ingredientName: "pepper", quantity: 100, unit: .millilitres, storageLocation: .pantry),
+            PantryIngredient(ingredientName: "brussels sprouts", quantity: 1000, unit: .grams, storageLocation: .fridge),
+            PantryIngredient(ingredientName: "dijon mustard", quantity: 100, unit: .millilitres, storageLocation: .pantry),
+            PantryIngredient(ingredientName: "honey", quantity: 100, unit: .millilitres, storageLocation: .pantry),
+            PantryIngredient(ingredientName: "olive oil", quantity: 480, unit: .millilitres, storageLocation: .pantry),
+            PantryIngredient(ingredientName: "red wine vinegar", quantity: 100, unit: .millilitres, storageLocation: .pantry),
+            PantryIngredient(ingredientName: "walnuts", quantity: 200, unit: .millilitres, storageLocation: .pantry),
+        ]
+        let store = InMemoryPantryStore(initial: pantry)
+
+        let outcome = try UpdateInventoryAfterCookingUseCase(store: store)
+            .execute(PantryMatchResult.matching(cooked, against: pantry))
+
+        #expect(outcome.needsManualReview.isEmpty)
+        #expect(Set(outcome.deducted).count == 7)
+    }
+
+    /// Reproduces the user's exact report: everything else deducts fine, only olive oil needs
+    /// manual review and is left untouched — because its pantry line is a `.pieces` count
+    /// (e.g. from an earlier purchase whose source recipe used the bare "T" abbreviation,
+    /// which this branch's IngredientUnit fix now prevents *going forward* — this test
+    /// documents that an *already*-corrupted pantry line still, correctly, cannot be
+    /// auto-repaired: the original amount and unit are already lost, so this remains an
+    /// honest "update it by hand" case, not a bug to paper over).
+    @Test func updateInventory_onlyOliveOilNeedsManualReview_whenItsPantryLineIsPiecesNotVolume() throws {
+        let cooked = try realCrunchyBrusselsSprouts()
+        let pantry = [
+            PantryIngredient(ingredientName: "pepper", quantity: 100, unit: .millilitres, storageLocation: .pantry),
+            PantryIngredient(ingredientName: "brussels sprouts", quantity: 1000, unit: .grams, storageLocation: .fridge),
+            PantryIngredient(ingredientName: "dijon mustard", quantity: 100, unit: .millilitres, storageLocation: .pantry),
+            PantryIngredient(ingredientName: "honey", quantity: 100, unit: .millilitres, storageLocation: .pantry),
+            PantryIngredient(ingredientName: "olive oil", quantity: 1, unit: .pieces, storageLocation: .pantry), // corrupted
+            PantryIngredient(ingredientName: "red wine vinegar", quantity: 100, unit: .millilitres, storageLocation: .pantry),
+            PantryIngredient(ingredientName: "walnuts", quantity: 200, unit: .millilitres, storageLocation: .pantry),
+        ]
+        let store = InMemoryPantryStore(initial: pantry)
+
+        let outcome = try UpdateInventoryAfterCookingUseCase(store: store)
+            .execute(PantryMatchResult.matching(cooked, against: pantry))
+
+        #expect(outcome.needsManualReview.map(\.name) == ["olive oil"])
+        #expect(Set(outcome.deducted) == ["pepper", "brussels sprouts", "dijon mustard", "honey", "red wine vinegar", "walnuts"])
+        #expect(store.load().first { $0.ingredientName == "olive oil" }?.quantity == 1) // untouched
+    }
+
     /// A real-inventory-corruption risk found while diagnosing the "onion 200 pcs" shopping
     /// list bug: the same untrustworthy "servings" quantity that inflated the shopping list
     /// could also deduct a fabricated amount of *real* pantry stock on Mark as Cooked. An
