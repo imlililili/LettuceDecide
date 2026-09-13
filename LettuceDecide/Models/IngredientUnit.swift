@@ -143,4 +143,32 @@ enum IngredientUnit: String, CaseIterable, Identifiable, Codable {
         }
         return (((millilitres * 100).rounded()) / 100, .millilitres)
     }
+
+    /// Converts `quantity` of `self` into `targetUnit`, or `nil` when that conversion isn't a
+    /// safe, ingredient-independent one.
+    ///
+    /// The single place every "can these two quantities be compared or combined" decision in
+    /// the app should go through — comparing a recipe's required amount against a pantry
+    /// line's stock (`UpdateInventoryAfterCookingUseCase`, `PantryShortfallCalculator`, the
+    /// Recipe Detail checklist), not a second copy of the same reasoning. Reuses
+    /// `VolumeConversion` rather than re-deriving it, so the two never drift apart.
+    ///
+    /// Succeeds when `unit == targetUnit` (trivially), or when both are volume units
+    /// (`millilitres`/`cups`/`tablespoons`/`teaspoons`) — a fixed ratio, nothing to guess.
+    /// Fails (returns `nil`) for anything crossing `measurementGroup` — weight, volume, and
+    /// count each need information this app does not model (an ingredient's density or
+    /// average item size) to convert between, and that boundary must never quietly move.
+    /// Weight and count are each a single-unit group today, so this only ever does real work
+    /// between volume units — but is written generically rather than volume-specific, so a
+    /// future unit added to an existing group is handled without another call site to update.
+    static func convert(_ quantity: Double, from unit: IngredientUnit, to targetUnit: IngredientUnit) -> Double? {
+        if unit == targetUnit { return quantity }
+        guard
+            let millilitres = VolumeConversion.millilitres(for: quantity, unit: unit),
+            let millilitresPerTargetUnit = VolumeConversion.millilitres(for: 1, unit: targetUnit)
+        else {
+            return nil
+        }
+        return millilitres / millilitresPerTargetUnit
+    }
 }

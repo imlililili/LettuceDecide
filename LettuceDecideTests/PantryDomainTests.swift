@@ -211,3 +211,29 @@ struct NormalizedForPantryStorageTests {
         #expect(pieces.unit == .pieces)
     }
 }
+
+/// The shared helper behind the cooking-deduction volume-conversion fix — every "can these
+/// two quantities be compared" decision (`UpdateInventoryAfterCookingUseCase`,
+/// `PantryShortfallCalculator`, the Recipe Detail checklist) goes through this one function.
+struct IngredientUnitConvertTests {
+    @Test func sameUnitReturnsTheQuantityUnchanged() {
+        #expect(IngredientUnit.convert(200, from: .grams, to: .grams) == 200)
+        #expect(IngredientUnit.convert(2, from: .cups, to: .cups) == 2)
+    }
+
+    @Test func convertsWithinTheVolumeGroup() {
+        // 2 tbsp = 30ml -> in millilitres.
+        #expect(IngredientUnit.convert(2, from: .tablespoons, to: .millilitres) == 30)
+        // 480ml -> in cups (2 cups).
+        #expect(IngredientUnit.convert(480, from: .millilitres, to: .cups) == 2)
+        // 1 cup -> in teaspoons (240ml / 5ml per tsp = 48 tsp).
+        #expect(IngredientUnit.convert(1, from: .cups, to: .teaspoons) == 48)
+    }
+
+    @Test func returnsNilAcrossMeasurementGroups() {
+        #expect(IngredientUnit.convert(200, from: .grams, to: .pieces) == nil)
+        #expect(IngredientUnit.convert(2, from: .pieces, to: .millilitres) == nil)
+        #expect(IngredientUnit.convert(1, from: .cups, to: .grams) == nil)
+        #expect(IngredientUnit.convert(100, from: .grams, to: .tablespoons) == nil)
+    }
+}
