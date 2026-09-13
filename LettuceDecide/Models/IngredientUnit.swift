@@ -32,7 +32,27 @@ enum IngredientUnit: String, CaseIterable, Identifiable, Codable {
     /// Returns `nil` for anything unrecognised — the caller then treats the
     /// quantity as not automatically comparable (see `UpdateInventoryAfterCookingUseCase`).
     init?(spoonacularUnit raw: String) {
-        switch raw.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        // "T" vs "t" is the one genuinely case-*sensitive* abbreviation in traditional recipe
+        // notation — capital T for tablespoon, lowercase t for teaspoon — and Spoonacular's
+        // own data really does use both this way (live-confirmed: "3 T. olive oil" carries
+        // measures.us.unitLong "Tbsps"; "1 t vanilla" carries "teaspoons"). This has to be
+        // checked before lowercasing everything else below, or the two become indistinguishable
+        // and one of them is guaranteed to be misread. Diagnosed live as the root cause of a
+        // real "Mark as Cooked" failure: a recipe using bare "T" for olive oil silently fell
+        // back to `.pieces` (nothing else recognises a lone "t"/"T"), so the pantry ended up
+        // with an unconvertible pieces-count for what should have been a volume amount.
+        if trimmed == "T" {
+            self = .tablespoons
+            return
+        }
+        if trimmed == "t" {
+            self = .teaspoons
+            return
+        }
+
+        switch trimmed.lowercased() {
         case "g", "gram", "grams", "gr": self = .grams
         case "ml", "milliliter", "milliliters", "millilitre", "millilitres": self = .millilitres
         case "", "piece", "pieces", "x", "serving", "servings": self = .pieces

@@ -127,6 +127,25 @@ struct IngredientUnitTests {
         #expect(IngredientUnit(spoonacularUnit: "gr") == .grams)
         #expect(IngredientUnit(spoonacularUnit: "GR") == .grams)
     }
+
+    /// Live-diagnosed root cause of a real "Mark as Cooked" failure: traditional recipe
+    /// notation abbreviates tablespoon as capital "T" and teaspoon as lowercase "t" — the
+    /// SAME letter, distinguished only by case — and Spoonacular's own data genuinely uses
+    /// both this way ("3 T. olive oil" -> Tbsps; "1 t vanilla" -> teaspoons, both confirmed
+    /// live via each line's own `measures.us.unitLong`). Neither was recognised before, so
+    /// both silently fell back to `.pieces` — an ingredient normally tracked by volume (like
+    /// olive oil) ending up an unconvertible piece-count in the pantry, exactly the class of
+    /// bug `IngredientUnit.convert` correctly refuses to guess through.
+    @Test func recognisesTheCaseSensitiveTAbbreviationsForTablespoonAndTeaspoon() {
+        #expect(IngredientUnit(spoonacularUnit: "T") == .tablespoons)
+        #expect(IngredientUnit(spoonacularUnit: "t") == .teaspoons)
+    }
+
+    /// Confirms the T/t distinction really is case-sensitive and not just "single letter
+    /// means tablespoon" or similar — swapping the case must swap the result.
+    @Test func tAndTAreNotInterchangeable() {
+        #expect(IngredientUnit(spoonacularUnit: "T") != IngredientUnit(spoonacularUnit: "t"))
+    }
 }
 
 struct IngredientUnitRescalingTests {

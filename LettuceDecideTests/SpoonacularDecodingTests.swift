@@ -101,6 +101,35 @@ struct SpoonacularDecodingEdgeCaseTests {
         #expect(ingredients.first { $0.name == "salt" }?.unit == .teaspoons)
     }
 
+    /// Regression for a real "Mark as Cooked" failure, live-diagnosed against the actual
+    /// recipe that reproduced it (Spoonacular id 640941, "Crunchy Brussels Sprouts Side
+    /// Dish" uses the fully-spelled "Tbs" for its own olive oil line and so decoded fine on
+    /// its own — the corrupted pantry data came from a *different* recipe's olive oil line
+    /// using bare "T", confirmed live: "3 T. olive oil" reports `measures.us.unitLong`
+    /// "Tbsps"). Before this fix, "T" fell through to `.pieces`, so an ingredient normally
+    /// tracked by volume ended up an unconvertible piece-count once bought into the pantry -
+    /// exactly the class of mismatch `UpdateInventoryAfterCookingUseCase` then has no choice
+    /// but to send to manual review, on every future recipe that also needs it.
+    @Test func bareCapitalTAndLowercaseTAreParsedAsTablespoonsAndTeaspoonsNotPieces() throws {
+        let json = """
+        { "results": [ { "id": 1, "title": "T", "extendedIngredients": [
+            { "id": 4053, "name": "olive oil", "amount": 3, "unit": "T" },
+            { "id": 30, "name": "vanilla", "amount": 1, "unit": "t" }
+        ] } ] }
+        """.data(using: .utf8)!
+
+        let ingredients = try #require(
+            try SpoonacularRecipeRepository.parseCandidates(from: json).first?.recipe.requiredIngredients
+        )
+
+        let oliveOil = try #require(ingredients.first { $0.name == "olive oil" })
+        #expect(oliveOil.unit == .tablespoons)
+        #expect(!oliveOil.quantityIsUncertain)
+
+        let vanilla = try #require(ingredients.first { $0.name == "vanilla" })
+        #expect(vanilla.unit == .teaspoons)
+    }
+
     /// Regression for the diagnosed "onion 200 pcs" bug: Spoonacular sometimes puts
     /// "servings"/"serving" in an ingredient's unit field (e.g. "4 servings" of green onion
     /// on one recipe line) — not a real piece count. Confirmed live against the real API.
