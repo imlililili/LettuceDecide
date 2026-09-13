@@ -84,4 +84,44 @@ final class HomeFlowUITests: FridgeFitUITestCase {
         app.tabBars.buttons["Pantry"].tap()
         XCTAssertTrue(app.staticTexts["curry powder"].waitForExistence(timeout: 5))
     }
+
+    /// Marking a confirmed meal as cooked must remove its card from Home — otherwise a meal
+    /// the cook already ate keeps sitting in "this week's meals" forever.
+    @MainActor
+    func testMarkingAConfirmedMealAsCookedRemovesItsCardFromHome() throws {
+        let app = launchApp()
+
+        stockPantryFromEmptyState(app, name: "chickpeas", quantity: "1000")
+
+        app.tabBars.buttons["Calendar"].tap()
+        XCTAssertTrue(app.navigationBars["Weekly Planner"].waitForExistence(timeout: 5))
+        app.buttons["Generate This Week's Plan"].tap()
+        XCTAssertTrue(app.navigationBars["This Week's Plan"].waitForExistence(timeout: 20))
+
+        let curry = app.staticTexts["Chickpea and Spinach Curry"]
+        XCTAssertTrue(curry.waitForExistence(timeout: 5))
+        curry.tap()
+        let planButton = app.buttons.matching(
+            NSPredicate(format: "label BEGINSWITH %@", "Plan This for")
+        ).firstMatch
+        XCTAssertTrue(planButton.waitForExistence(timeout: 5))
+        planButton.tap()
+        app.buttons["OK"].tap()
+
+        app.tabBars.buttons["Home"].tap()
+        XCTAssertTrue(curry.waitForExistence(timeout: 5))
+        curry.tap()
+
+        let cookButton = app.buttons["Mark as Cooked"]
+        XCTAssertTrue(cookButton.waitForExistence(timeout: 5))
+        cookButton.tap()
+        let ok = app.buttons["OK"]
+        XCTAssertTrue(ok.waitForExistence(timeout: 5))
+        ok.tap()
+
+        // "Mark as Cooked" on a success notice pops back to Home automatically.
+        XCTAssertTrue(app.navigationBars["Home"].waitForExistence(timeout: 5))
+        XCTAssertFalse(curry.waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["No confirmed meals yet"].waitForExistence(timeout: 5))
+    }
 }
