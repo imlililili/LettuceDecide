@@ -64,6 +64,44 @@ struct RecipeDetailViewModelTests {
         #expect(viewModel.ingredientStatuses.map(\.kind) == [.have, .shortBy(have: 60, unit: .grams)])
     }
 
+    /// The checklist must convert within a measurement group too, not only exact-unit-match:
+    /// the pantry stores olive oil in millilitres (post-normalisation) while the recipe still
+    /// calls for tablespoons — this should read as an honest "short by" amount, not a
+    /// false-positive "have" (the old exact-match rule silently fell through to `.have`
+    /// whenever units differed at all, hiding a real shortfall).
+    @Test func ingredientStatusesConvertWithinAMeasurementGroupInsteadOfFalsePositiveHave() throws {
+        let cooked = recipe([
+            RecipeIngredient(id: 1, name: "olive oil", requiredQuantity: 2, unit: .tablespoons)
+        ])
+        let store = InMemoryPantryStore(initial: [
+            PantryIngredient(ingredientName: "olive oil", quantity: 10, unit: .millilitres, storageLocation: .pantry)
+        ])
+        let viewModel = makeViewModel(cooked, pantryStore: store)
+
+        // 2 tbsp needed = 30ml; only 10ml on hand = 10/15 = 0.667 tbsp worth.
+        let statuses = viewModel.ingredientStatuses
+        #expect(statuses.count == 1)
+        guard case .shortBy(let have, let unit) = statuses.first?.kind else {
+            Issue.record("expected .shortBy, got \(String(describing: statuses.first?.kind))")
+            return
+        }
+        #expect(unit == .tablespoons)
+        #expect(abs(have - (10.0 / 15.0)) < 0.0001)
+    }
+
+    @Test func ingredientStatusesStillFallBackToHaveAcrossUnconvertibleMeasurementGroups() {
+        let cooked = recipe([
+            RecipeIngredient(id: 1, name: "flour", requiredQuantity: 300, unit: .grams)
+        ])
+        let store = InMemoryPantryStore(initial: [
+            PantryIngredient(ingredientName: "flour", quantity: 2, unit: .cups, storageLocation: .pantry)
+        ])
+        let viewModel = makeViewModel(cooked, pantryStore: store)
+
+        // Weight vs volume can't be compared -- same conservative fallback as before.
+        #expect(viewModel.ingredientStatuses.map(\.kind) == [.have])
+    }
+
     // MARK: - .confirmed: Mark as Cooked deducts once the day has arrived
 
     @Test func fromConfirmed_markAsCookedDeductsAndReportsSuccess() throws {

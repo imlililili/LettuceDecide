@@ -68,7 +68,9 @@ struct PantryShortfallCalculatorTests {
         #expect(toBuy.first?.requiredQuantity == 300)
     }
 
-    @Test func anIngredientHeldInADifferentUnitIsLeftAloneAndNotTreatedAsMissing() {
+    /// Genuinely cross-group (weight vs volume) — flour in cups can't be safely compared to
+    /// flour in grams — so this stays left-alone after the volume-conversion fix too.
+    @Test func anIngredientHeldInAnUnconvertibleUnitIsLeftAloneAndNotTreatedAsMissing() {
         var pantry = [PantryIngredient(ingredientName: "flour", quantity: 2, unit: .cups, storageLocation: .pantry)]
 
         let toBuy = PantryShortfallCalculator.stillNeeded(
@@ -79,6 +81,38 @@ struct PantryShortfallCalculatorTests {
 
         #expect(toBuy.isEmpty)
         #expect(pantry.first?.quantity == 2) // untouched, not deducted, not guessed at
+    }
+
+    // MARK: - Same-measurement-group volume conversion
+
+    @Test func aDifferentButConvertibleVolumeUnitIsDeductedNormally() {
+        var pantry = [PantryIngredient(ingredientName: "olive oil", quantity: 480, unit: .millilitres, storageLocation: .pantry)]
+
+        let toBuy = PantryShortfallCalculator.stillNeeded(
+            for: recipe(1, ingredients: [ingredient(1, "olive oil", 2, .tablespoons)]),
+            from: &pantry,
+            now: now
+        )
+
+        #expect(toBuy.isEmpty)
+        #expect(pantry.first?.quantity == 450) // 480ml - 30ml (2 tbsp)
+    }
+
+    @Test func aPartialConvertibleAmountBuysTheShortfallInTheRecipesOwnUnit() throws {
+        var pantry = [PantryIngredient(ingredientName: "olive oil", quantity: 10, unit: .millilitres, storageLocation: .pantry)]
+
+        let toBuy = PantryShortfallCalculator.stillNeeded(
+            for: recipe(1, ingredients: [ingredient(1, "olive oil", 2, .tablespoons)]),
+            from: &pantry,
+            now: now
+        )
+
+        #expect(pantry.isEmpty)
+        // 2 tbsp needed (30ml), 10ml on hand -> 20ml short -> expressed back in tablespoons:
+        // 20ml / 15ml per tbsp = 1.33... tbsp.
+        #expect(toBuy.first?.unit == .tablespoons)
+        let requiredQuantity = try #require(toBuy.first?.requiredQuantity)
+        #expect(abs(requiredQuantity - (20.0 / 15.0)) < 0.0001)
     }
 
     /// Regression for the diagnosed "onion 200 pcs" bug: an ingredient whose quantity is

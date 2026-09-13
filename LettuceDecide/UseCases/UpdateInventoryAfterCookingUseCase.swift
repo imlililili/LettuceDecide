@@ -23,9 +23,11 @@ enum InventoryUpdateError: LocalizedError, Equatable {
 struct InventoryUpdateOutcome: Equatable {
     /// Names of pantry lines whose quantity was reduced (or that were used up entirely).
     let deducted: [String]
-    /// Recipe ingredients the cook has to reconcile by hand because the recipe measures
-    /// them in a unit the pantry does not store them in — the app never guesses a
-    /// cross-unit conversion.
+    /// Recipe ingredients the cook has to reconcile by hand because the recipe measures them
+    /// in a unit that can't be safely converted into what the pantry stores them in (see
+    /// `IngredientUnit.convert`) — e.g. the recipe wants grams and the pantry has it in
+    /// pieces. A same-*measurement-group* mismatch (the recipe in tablespoons, the pantry in
+    /// millilitres) is converted and deducted normally, not flagged here.
     let needsManualReview: [RecipeIngredient]
 }
 
@@ -38,8 +40,11 @@ struct InventoryUpdateOutcome: Equatable {
 /// - only the pantry lines the recommendation actually matched are touched;
 /// - a line that has been removed since the recommendation was shown throws
 ///   `ingredientNotFound` (the whole update is abandoned, nothing is saved);
-/// - if the recipe's unit for an ingredient differs from the unit the pantry stores it in,
-///   that ingredient is skipped and reported in `needsManualReview` — no conversion;
+/// - if the recipe's unit for an ingredient can't be converted into the pantry's unit for it
+///   (`IngredientUnit.convert` — different `measurementGroup`, e.g. grams vs pieces), that
+///   ingredient is skipped and reported in `needsManualReview` — still no guessing there. A
+///   same-group mismatch (the recipe in tablespoons, the pantry storing it in millilitres) is
+///   a safe, ingredient-independent conversion and is deducted normally;
 /// - if the recipe's own quantity for an ingredient is flagged uncertain (see
 ///   `RecipeIngredient.quantityIsUncertain`), it is likewise skipped into
 ///   `needsManualReview` rather than deducted — a fabricated number must never take real
@@ -69,17 +74,17 @@ struct UpdateInventoryAfterCookingUseCase {
                 needsReview.append(required)
                 continue
             }
-            guard required.unit == line.unit else {
+            guard let requiredInPantryUnit = IngredientUnit.convert(required.requiredQuantity, from: required.unit, to: line.unit) else {
                 needsReview.append(required)
                 continue
             }
 
-            let remaining = line.quantity - required.requiredQuantity
+            let remaining = line.quantity - requiredInPantryUnit
             if remaining < 0 {
                 throw InventoryUpdateError.insufficientQuantity(
                     ingredientName: line.ingredientName,
                     available: line.quantity,
-                    requested: required.requiredQuantity
+                    requested: requiredInPantryUnit
                 )
             }
 

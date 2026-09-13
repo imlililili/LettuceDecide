@@ -190,8 +190,14 @@ final class RecipeDetailViewModel: ObservableObject {
         guard let owned = ownedLines.first(where: { $0.ingredientName.normalizedIngredientName == key }) else {
             return .missing
         }
-        if owned.unit == required.unit, owned.quantity < required.requiredQuantity {
-            return .shortBy(have: owned.quantity, unit: required.unit)
+        // Same-measurement-group amounts (e.g. the recipe in tablespoons, the pantry storing
+        // it in millilitres) are converted and compared for real via IngredientUnit.convert —
+        // a cross-group mismatch (grams vs pieces) can't be compared, so it falls through to
+        // .have, same conservative assumption as before ("the cook has it, just can't verify
+        // how much").
+        if let ownedInRequiredUnit = IngredientUnit.convert(owned.quantity, from: owned.unit, to: required.unit),
+           ownedInRequiredUnit < required.requiredQuantity {
+            return .shortBy(have: ownedInRequiredUnit, unit: required.unit)
         }
         return .have
     }

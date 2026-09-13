@@ -5,15 +5,18 @@ import Foundation
 /// shortfalls day by day) and confirming a single planned meal (netting against every other
 /// day already confirmed, so the same physical stock isn't offered to two different days).
 ///
-/// Rules (same "unit-match-only, never guess a conversion" stance as
-/// `UpdateInventoryAfterCookingUseCase`):
+/// Rules (same "convert within a measurement group, never guess across one" stance as
+/// `UpdateInventoryAfterCookingUseCase` — both go through `IngredientUnit.convert`):
 /// - a required ingredient whose quantity is flagged uncertain (see
 ///   `RecipeIngredient.quantityIsUncertain`) is never compared against the pantry at all —
 ///   there's no trustworthy number to compare with — and goes straight onto the shopping
 ///   list as its own honest "amount unclear" line;
 /// - an ingredient the pantry doesn't have at all → the full required amount is needed;
-/// - an ingredient the pantry has, but in a different unit → left alone, not treated as
-///   missing (the cook has it; the app just can't compare grams to cups);
+/// - an ingredient the pantry has, but in a unit that can't be converted into it (different
+///   `measurementGroup`, e.g. the recipe wants grams and the pantry has it in pieces) → left
+///   alone, not treated as missing (the cook has it; the app just can't compare them). A
+///   same-group mismatch (recipe in tablespoons, pantry in millilitres) *is* converted and
+///   compared normally — that's a safe, ingredient-independent ratio, nothing to guess;
 /// - an ingredient the pantry has enough of → nothing is needed, and that amount is drawn
 ///   down from `pantry` so a second recipe sharing the ingredient sees what's left;
 /// - an ingredient the pantry has some of, but not enough → drained to zero and the
@@ -46,20 +49,23 @@ enum PantryShortfallCalculator {
             }
 
             let line = pantry[index]
-            guard line.unit == required.unit else { continue }
+            guard let requiredInPantryUnit = IngredientUnit.convert(required.requiredQuantity, from: required.unit, to: line.unit) else {
+                continue
+            }
 
-            if line.quantity >= required.requiredQuantity {
-                let remaining = line.quantity - required.requiredQuantity
+            if line.quantity >= requiredInPantryUnit {
+                let remaining = line.quantity - requiredInPantryUnit
                 if remaining == 0 {
                     pantry.remove(at: index)
                 } else {
                     pantry[index].quantity = remaining
                 }
             } else {
+                let availableInRequiredUnit = IngredientUnit.convert(line.quantity, from: line.unit, to: required.unit) ?? 0
                 pantry.remove(at: index)
                 toBuy.append(shoppingItem(
                     for: required,
-                    quantity: required.requiredQuantity - line.quantity,
+                    quantity: required.requiredQuantity - availableInRequiredUnit,
                     now: now
                 ))
             }
